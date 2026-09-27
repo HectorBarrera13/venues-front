@@ -30,10 +30,11 @@ jobs:
       - name: "install dependencies"
         run: npm ci
 
-      - name: Type Check & Build
-        run: |
-          npx tsc --noEmit
-          npm run build
+      - name: Run Linter
+        run: npm run lint
+
+      - name: "Build"
+        run: npm run build
 
       - name: "tests"
         run: "npm test"
