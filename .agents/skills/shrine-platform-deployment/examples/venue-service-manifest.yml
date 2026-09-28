@@ -1,0 +1,26 @@
+apiVersion: shrine/v1
+kind: Application
+metadata:
+  name: venue-service
+  owner: subagentes
+spec:
+  image: 192.168.1.206:5000/subagentes-venue-service:latest
+  port: 8080
+  routing:
+    domain: subagentes.venue-service.internal
+    aliases:
+      - host: gateway.tail9a6ddb.ts.net
+        pathPrefix: /venues
+        stripPrefix: true
+        tls: true
+  networking:
+    exposeToPlatform: true
+  dependencies:
+    - kind: Resource
+      name: venue-db
+      owner: subagentes
+  env:
+    - name: BASE_URL
+      value: "https://gateway.tail9a6ddb.ts.net/venues"
+    - name: DATABASE_URL
+      valueFrom: resource.venue-db.url

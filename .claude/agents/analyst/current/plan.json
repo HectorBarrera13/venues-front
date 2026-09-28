@@ -1,0 +1,98 @@
+{
+  "change_id": "CHG-REMOVE-VENUE-AUTH-REQUIREMENT",
+  "objective": "Eliminate mandatory authentication/credential check in venue registration so that frontend requests to POST /venues succeed without 403 Forbidden errors while credentials are not yet configured.",
+  "decisions": [
+    {
+      "id": "DEC-001",
+      "decision": "Remove the mandatory role check ('Only venue owners can register venues') from VenueService.registerVenue in backend/src/services/VenueService.js so unauthenticated requests and requests without credentials do not throw a 403 Forbidden ApiError."
+    },
+    {
+      "id": "DEC-002",
+      "decision": "In VenueService.registerVenue, assign the venue ownerId using a fallback chain: currentUser?.userId || currentUser?.id || data?.ownerId || 'venue-owner-1', ensuring the Venue entity always has a valid ownerId without requiring credentials."
+    },
+    {
+      "id": "DEC-003",
+      "decision": "Preserve required field validation (name, description, location) in VenueService.registerVenue, keeping the 400 Bad Request error contract intact for invalid payloads."
+    },
+    {
+      "id": "DEC-004",
+      "decision": "Extend backend/tests/VenueService.test.js with comprehensive unit tests for registerVenue covering unauthenticated creation, authenticated creation, fallback ownerId resolution, and required field validation."
+    }
+  ],
+  "permitted_writes": [
+    "backend/src/services/VenueService.js",
+    "backend/tests/VenueService.test.js"
+  ],
+  "invariants": [
+    "Do not modify AGENTS.md, .gitignore, or any file under .agents/**.",
+    "Preserve all existing venue field validations (name, description, location must be non-empty strings).",
+    "Preserve Venue persistence through VenueRepository.",
+    "Existing unit and integration tests across backend/tests/ must continue to pass without regression."
+  ],
+  "affected_files": [
+    {
+      "path": "backend/src/services/VenueService.js",
+      "operation": "MODIFY",
+      "instructions": [
+        "In registerVenue(data, currentUser):",
+        "  - Remove the currentUser role check that throws ApiError(403, 'Only venue owners can register venues').",
+        "  - Retain required field validation for name, description, and location.",
+        "  - Resolve ownerId = currentUser?.userId || currentUser?.id || data?.ownerId || 'venue-owner-1'.",
+        "  - Construct venue with new Venue(name.trim(), description.trim(), location.trim(), ownerId).",
+        "  - Return this.venueRepository.save(venue).",
+        "  - Update method JSDoc to reflect that authentication is optional."
+      ],
+      "acceptance": [
+        "registerVenue does not throw 403 when currentUser is undefined or does not possess the venue_owner role.",
+        "A valid Venue instance with ownerId is created and persisted in the repository."
+      ]
+    },
+    {
+      "path": "backend/tests/VenueService.test.js",
+      "operation": "MODIFY",
+      "instructions": [
+        "Import ApiError from '../src/errors/ApiError' and Venue from '../src/entities/Venue'.",
+        "Add describe('registerVenue', ...) suite to backend/tests/VenueService.test.js:",
+        "  - Tests successful registration when currentUser is undefined (defaults ownerId to 'venue-owner-1').",
+        "  - Tests successful registration when currentUser is provided (uses currentUser.userId).",
+        "  - Tests successful registration when data.ownerId is provided without currentUser.",
+        "  - Tests that required fields (name, description, location) throw ApiError with status 400 when missing or empty.",
+        "  - Tests that no 403 Forbidden error is thrown."
+      ],
+      "acceptance": [
+        "All tests in backend/tests/VenueService.test.js pass when run with Jest."
+      ]
+    },
+    {
+      "path": "backend/tests/VenueController.test.js",
+      "operation": "VERIFY",
+      "instructions": [
+        "Verify existing controller tests pass without modification."
+      ],
+      "acceptance": [
+        "VenueController.test.js passes without regression."
+      ]
+    },
+    {
+      "path": "backend/tests/venues.routes.test.js",
+      "operation": "VERIFY",
+      "instructions": [
+        "Verify existing route integration tests pass without modification."
+      ],
+      "acceptance": [
+        "venues.routes.test.js passes without regression."
+      ]
+    },
+    {
+      "path": "backend/tests/cors.test.js",
+      "operation": "VERIFY",
+      "instructions": [
+        "Verify existing CORS tests pass without modification."
+      ],
+      "acceptance": [
+        "cors.test.js passes without regression."
+      ]
+    }
+  ],
+  "blockers": []
+}

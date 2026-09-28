@@ -1,0 +1,16 @@
+apiVersion: shrine/v1
+kind: Resource
+metadata:
+  name: booking-db
+  owner: sap-atitos
+spec:
+  type: postgres
+  version: "16"
+  port: "5432"
+  outputs:
+    - name: host
+    - name: port
+    - name: password
+      generated: true
+    - name: url
+      template: "postgres://postgres:{{.password}}@{{.host}}:{{.port}}/booking"

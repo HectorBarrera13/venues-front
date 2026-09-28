@@ -1,0 +1,35 @@
+apiVersion: shrine/v1
+kind: Application
+metadata:
+  name: booking
+  owner: sap-atitos
+spec:
+  image: 192.168.1.206:5000/sap-atitos-booking:latest
+  port: 8080
+  routing:
+    domain: sap-atitos.booking.internal
+    aliases:
+      - host: gateway.tail9a6ddb.ts.net
+        pathPrefix: /booking
+        stripPrefix: true
+        tls: true
+  networking:
+    exposeToPlatform: true
+  dependencies:
+    - kind: Resource
+      name: booking-redis
+      owner: sap-atitos
+    - kind: Resource
+      name: booking-db
+      owner: sap-atitos
+  env:
+    - name: SPRING_PROFILES_ACTIVE
+      value: "prod"
+    - name: BASE_URL
+      value: "https://gateway.tail9a6ddb.ts.net/booking"
+    - name: SPRING_DATA_REDIS_HOST
+      valueFrom: resource.booking-redis.host
+    - name: SPRING_DATA_REDIS_PORT
+      valueFrom: resource.booking-redis.port
+    - name: DATABASE_URL
+      valueFrom: resource.booking-db.url

@@ -1,0 +1,59 @@
+#!/usr/bin/env bash
+# .githooks/commit-msg
+#
+# Validates Conventional Commits and ensures every commit message is associated
+# with an issue ticket. If the ticket is omitted from the message, it automatically
+# extracts the ticket ID from the branch name (e.g. feature/AZ-123-description).
+
+ALLOWED_PREFIXES=("feat" "fix" "build" "chore" "ci" "docs" "style" "refactor" "perf" "test")
+TERMINAL_RED='\033[0;31m'
+TERMINAL_BLUE='\033[0;36m'
+TERMINAL_YELLOW='\033[0;33m'
+TERMINAL_NO_COLOR='\033[0m'
+
+# Extract git branch
+parse_git_branch() {
+  git branch 2> /dev/null | sed -e '/^[^*]/d' -e 's/* \(.*\)/(\1)/'
+}
+
+# Extract ticket ID from branch name (e.g. AZ-123, OPS-42)
+parse_git_branch_for_issue() {
+  parse_git_branch | grep -e '[A-Z]\+-[0-9]\+' -o
+}
+
+MESSAGE_FILE="$1"
+MESSAGE="$(cat "$MESSAGE_FILE")"
+PARSED_MESSAGE=( $MESSAGE )
+
+# Check if the first word is in the list of allowed prefixes and followed by a colon
+FIRST_WORD="${PARSED_MESSAGE[0]}"
+PREFIX=${FIRST_WORD/%?}
+
+if ! [[ " ${ALLOWED_PREFIXES[*]}: " =~ " ${PREFIX} " ]]; then
+  echo -e "${TERMINAL_RED}====== COMMIT REJECTED ======${TERMINAL_NO_COLOR}"
+  echo "Commit message must follow Conventional Commits format:"
+  echo -e "${TERMINAL_BLUE}   <type>(<scope>): <message> (<TICKET>) ${TERMINAL_NO_COLOR}"
+  echo -e "Allowed types: ${TERMINAL_YELLOW} ${ALLOWED_PREFIXES[*]} ${TERMINAL_NO_COLOR}"
+  echo "Example: feat(booking): add 5 minute hold expiry (AZ-142)"
+  exit 1
+fi
+
+## Validate commit message contains a Ticket or extract it from the branch name
+PARSED_MESSAGE_LENGTH=${#PARSED_MESSAGE[@]}
+TICKET=${PARSED_MESSAGE[PARSED_MESSAGE_LENGTH -1]}
+
+if ! (echo "$TICKET" | grep -q -E '^\([A-Z]{1,4}-[0-9]+\).*$'); then
+  TICKET_FROM_BRANCH=$(parse_git_branch_for_issue)
+
+  if [ -z "$TICKET_FROM_BRANCH" ]; then
+    echo -e "${TERMINAL_RED}====== COMMIT REJECTED ======${TERMINAL_NO_COLOR}"
+    echo "A Ticket ID (e.g. AZ-142, OPS-01) must be provided:"
+    echo " 1. At the end of the commit message in parentheses: feat: add endpoint (AZ-142)"
+    echo " 2. OR within the branch name: feature/AZ-142-seat-hold"
+    exit 1
+  fi
+
+  # Automatically append ticket from branch name
+  echo "Appending ticket from branch: ($TICKET_FROM_BRANCH)"
+  echo "$MESSAGE ($TICKET_FROM_BRANCH)" > "$MESSAGE_FILE"
+fi
