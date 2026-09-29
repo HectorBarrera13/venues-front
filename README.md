@@ -117,5 +117,3 @@ src/
 - **API Reference & Contracts**: See [docs/api.md](docs/api.md) for endpoints (`GET /venues`, `POST /venues`), payloads, and backend Swagger/OpenAPI details.
 - **Platform Architecture**: See [docs/architecture.md](docs/architecture.md) for system context, team domains, and C4 references.
 - **Operational Standards**: See [`AGENTS.md`](./AGENTS.md) for repository rules and CI/CD policies.
-
----
