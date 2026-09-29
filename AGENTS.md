@@ -29,7 +29,7 @@ Ticket D-Saster is a high-concurrency ticket sales and venue management platform
 - **Fans & Buyers** to search events (by artist, date, venue, location), view live seat maps, hold seats in 5-minute reservations, queue under heavy load, and securely purchase tickets with QR code issuance.
 - **Event Staff** to scan and validate tickets at gate checkpoints.
 
-### 1.3 Team Topologies & Microservice Architecture (C4 Level 2)
+### 1.2 Team Topologies & Microservice Architecture (C4 Level 2)
 The platform is decoupled into five cross-functional service teams and bounded contexts:
 
 | Domain | Classification | Assigned Team | Responsibilities & Services | Storage / Technology |
