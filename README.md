@@ -119,15 +119,3 @@ src/
 - **Operational Standards**: See [`AGENTS.md`](./AGENTS.md) for repository rules and CI/CD policies.
 
 ---
-
-## Contributing & Git Standards
-
-Commits must follow the **Conventional Commits** specification with the task ID in parentheses:
-
-```text
-<type>(<scope>): <short description> (<TICKET-ID>)
-```
-
-Examples:
-- `feat(map): add debounced forward address geocoding (VF-12)`
-- `fix(client): handle 403 status in venue registration (VF-15)`
