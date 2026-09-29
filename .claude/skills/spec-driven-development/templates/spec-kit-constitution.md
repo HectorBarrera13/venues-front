@@ -7,10 +7,6 @@ You are an AI coding assistant working on the Ticket D-Saster distributed system
 
 ## 1. Code Quality & Architecture
 - Prefer clean, maintainable, strongly-typed code.
-- Follow Hexagonal Architecture (Ports and Adapters):
-  - Domain core contains business entities and rules only; zero framework/database dependencies.
-  - Inbound ports (use cases) and outbound ports (repository interfaces) decouple business logic.
-  - Adapters handle REST controllers, database drivers, and message brokers.
 - For testing we use: [npm test / ./gradlew test / pytest]
 - For linting we use: [npm run lint / ./gradlew checkstyleMain / ruff check .]
 

@@ -146,7 +146,6 @@ When tasked with implementing features, bug fixes, or refactors, **never jump di
 
 ## 5. Architectural Principles & Coding Standards
 
-### 5.1 Hexagonal Architecture (Ports and Adapters)
 `venue-service` enforces clean separation of concerns:
 - **Domain Core**: Pure `Venue`, `Section`, `Row`, `PhysicalSeat` business entities and invariants. **Zero external framework, ORM, or database dependencies.**
 - **Ports**: Inbound ports (`CreateVenueUseCase`, `GetVenueSeatMapUseCase`) and Outbound ports (`VenueRepository`, `VenueEventPublisher`).
