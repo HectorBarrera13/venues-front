@@ -6,8 +6,6 @@ This document outlines the API contracts consumed by `venues-front`.
 
 The application communicates with the `venue-service` backend or the platform reverse proxy gateway.
 
-- Default local target: `http://localhost:8080` (or `http://quieroqueue:2000` via `.env`)
-- Platform Gateway: `https://gateway.tail9a6ddb.ts.net/venues`
 - OpenAPI Specification: Maintained in the `venue-service` repository and published as `openapi.yml` with backend releases.
 
 ---
