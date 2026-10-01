@@ -6,6 +6,10 @@ This file is the primary contract and operational guide for AI coding agents (an
 
 ---
 
+## Frontend Scope
+
+This checkout is `venues-front`, the shared Backstage frontend for Venues (SubAgentes) and Events (Aura). Read `context/product/now.md`, `docs/architecture.md`, and `docs/api.md` before frontend work. Authentication is mocked for the current MVP; Events POST exists in the backend, but frontend integration is pending. Backend-specific rules below apply to the owning services. Frontend commands are `npm run lint`, `npm run build`, and `npm test` (currently a placeholder that skips tests).
+
 ## 🏛️ Repository Identity & Service Context
 
 ## MANDATORY CONTEXT CONSULTATION (`context/`)

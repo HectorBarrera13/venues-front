@@ -1,6 +1,6 @@
 <div align="center">
 
-# Ticket D-Saster - Venues Frontend
+# Ticket D-Saster - Venues & Events Frontend
 
 [![React](https://img.shields.io/badge/React-19.2-20232A?style=flat-square&logo=react&logoColor=61DAFB)](https://react.dev/)
 [![Vite](https://img.shields.io/badge/Vite-8.3-646CFF?style=flat-square&logo=vite&logoColor=white)](https://vitejs.dev/)
@@ -9,9 +9,9 @@
 [![Conventional Commits](https://img.shields.io/badge/Conventional%20Commits-1.0.0-FE5196?style=flat-square&logo=conventionalcommits&logoColor=white)](https://conventionalcommits.org)
 [![Team](https://img.shields.io/badge/Team-SubAgentes-0052CC?style=flat-square)](https://github.com/HectorBarrera13/venues-front)
 
-Web frontend for venue owners in the **Ticket D-Saster** platform. It provides an administrative interface within the Backstage portal to register physical spaces, inspect venue catalogs, edit information, and pick geographical coordinates via an interactive map.
+Shared Backstage frontend for venue owners and event organizers in the **Ticket D-Saster** platform. It provides an administrative interface within the Backstage portal to register physical spaces, inspect venue catalogs, edit information, and pick geographical coordinates via an interactive map.
 
-Developed and maintained by **Team SubAgentes**.
+The Venues domain is maintained by **Team SubAgentes** and the Events domain by **Team Aura**.
 
 </div>
 
@@ -23,7 +23,12 @@ Developed and maintained by **Team SubAgentes**.
 - **Interactive Map Picker**: Leaflet and OpenStreetMap integration for bidirectional geocoding (click-to-pin and debounced search via Nominatim).
 - **Registration & Editing**: Form validation for venue details with in-place modal editing.
 - **Role-Based Guards**: UI boundaries restricting venue mutations to the `venue_owner` role.
+- **Events Integration (Pending)**: The Events backend supports registration, paginated listing, and detail retrieval. Frontend registration will collect name, artist, date, and a venue selected from the complete catalogue.
 - **Resilient API Handling**: Typed client errors separating validation (400) and authorization (403) failures.
+
+---
+
+The current MVP uses mocked authentication. See [context/product/now.md](context/product/now.md) for requirements and exclusions. Existing edit/delete actions affect local state only.
 
 ---
 
@@ -70,6 +75,8 @@ cp .env.example .env
 |---|---|---|
 | `VITE_API_BASE_URL` | Base URL for the venue-service API or gateway | `/api` |
 
+`VITE_API_BASE_URL` currently configures only the Venue client. Events will need a separate service URL or gateway route; no Events client/configuration exists yet. The existing `/api` development proxy has a single upstream.
+
 ### Running Locally
 
 ```bash
@@ -93,7 +100,7 @@ npm run preview
 | Build | `npm run build` | Compiles production assets into `dist/` |
 | Preview | `npm run preview` | Serves the production build locally |
 | Lint | `npm run lint` | Runs ESLint across all source files |
-| Test | `npm test` | Runs the configured test runner |
+| Test | `npm test` | Currently skips tests; no test runner is configured |
 
 ---
 
@@ -114,6 +121,6 @@ src/
 
 ## Documentation & API
 
-- **API Reference & Contracts**: See [docs/api.md](docs/api.md) for endpoints (`GET /venues`, `POST /venues`), payloads, and backend Swagger/OpenAPI details.
+- **API Reference & Contracts**: See [docs/api.md](docs/api.md) for Venue and Events endpoints, payloads, and backend OpenAPI details.
 - **Platform Architecture**: See [docs/architecture.md](docs/architecture.md) for system context, team domains, and C4 references.
 - **Operational Standards**: See [`AGENTS.md`](./AGENTS.md) for repository rules and CI/CD policies.
