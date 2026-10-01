@@ -7,6 +7,7 @@
 
 import { useState } from "react";
 import { useCreateVenue } from "../hooks/useCreateVenue";
+import { ApiClientError } from "../services/VenueApiClient.js";
 import LocationMapPicker from "./LocationMapPicker.jsx";
 import { VenueConfirmation } from "./VenueConfirmation";
 
@@ -26,6 +27,8 @@ export function VenueRegisterForm() {
   const [fieldErrors, setFieldErrors] = useState({});
   const { createVenue, reset, isLoading, isSuccess, isError, error, venue } =
     useCreateVenue();
+
+  const apiErrorStatus = error instanceof ApiClientError ? error.status : null;
 
   function handleChange(field) {
     return (event) => {
@@ -131,7 +134,18 @@ export function VenueRegisterForm() {
 
         {isError && (
           <p className="form-error form-error--summary" role="alert">
-            {error?.message}
+            {apiErrorStatus === 400 ? (
+              <>
+                <strong>Revisa los datos del recinto.</strong> {error.message}
+              </>
+            ) : apiErrorStatus === 403 ? (
+              <>
+                <strong>No tienes permiso para registrar recintos.</strong>{" "}
+                {error.message}
+              </>
+            ) : (
+              error?.message || "No pudimos registrar el recinto en este momento."
+            )}
           </p>
         )}
 
