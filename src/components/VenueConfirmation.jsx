@@ -1,6 +1,6 @@
-// src/features/venues/components/VenueConfirmation.jsx
+// src/components/VenueConfirmation.jsx
 //
-// Task 11: shown by VenueRegisterForm after a successful POST /venues.
+// Shown by VenueRegisterForm after a successful POST /venues.
 
 export function VenueConfirmation({ venue, onRegisterAnother }) {
   return (

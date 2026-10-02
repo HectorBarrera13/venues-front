@@ -1,4 +1,5 @@
 import useCurrentUser from '../hooks/useCurrentUser.js'
+import { ROLES } from '../auth/constants.js'
 import VenueOwnerOnly from './VenueOwnerOnly.jsx'
 
 function getInitials(name = '') {
@@ -24,7 +25,7 @@ function Header({ isRegisterRoute = typeof window !== 'undefined' && window.loca
             <span className="user-copy">
               <span className="user-name">{currentUser.name}</span>
               <span className="user-role">
-                {currentUser.role === 'venue_owner' ? 'Propietario' : 'Organizador'}
+                {currentUser.role === ROLES.VENUE_OWNER ? 'Propietario' : 'Organizador'}
               </span>
             </span>
           </div>

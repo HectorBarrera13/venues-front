@@ -1,9 +1,17 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import useCurrentUser from '../hooks/useCurrentUser.js'
+import { goToSignIn } from '../auth/session.js'
 import venueApiClient from '../services/VenueApiClient.js'
 import VenueCard from './VenueCard.jsx'
 import VenueEditModal from './VenueEditModal.jsx'
 import VenueOwnerOnly from './VenueOwnerOnly.jsx'
+
+function getLoadErrorMessage(error) {
+  if (error.status === 401)
+    return 'Tu sesión expiró o no es válida. Vuelve a iniciar sesión para ver tus recintos.'
+  if (error.status === 403) return 'No tienes permiso para ver estos recintos.'
+  return error.message
+}
 
 function StateIcon({ type }) {
   if (type === 'error') {
@@ -31,7 +39,9 @@ function MyVenues() {
       try {
         setVenues(await venueApiClient.getVenues({ signal: controller.signal }))
       } catch (requestError) {
-        if (requestError.name !== 'AbortError') setError(requestError.message)
+        if (requestError.name === 'AbortError') return
+        if (requestError.status === 401) goToSignIn()
+        setError(getLoadErrorMessage(requestError))
       } finally {
         if (!controller.signal.aborted) setLoading(false)
       }
