@@ -78,11 +78,30 @@ class VenueApiClient {
     this.baseUrl = baseUrl.replace(/\/$/, '')
   }
 
+  /**
+   * Lists the venues visible to the current session.
+   *
+   * GETs /venues with the access token as a Bearer credential, the same
+   * credential POST /venues uses. The backend resolves the owner from the
+   * token, so the request carries no query parameters.
+   *
+   * @param {{ signal?: AbortSignal }} [options]
+   * @returns {Promise<object[]>} The venues, as returned by the API
+   * @throws {ApiClientError} When the backend responds with a 4xx/5xx: 401
+   *   for a missing/expired/invalid token, 403 for a session that isn't
+   *   allowed to list venues.
+   * @throws {Error} On network failures or an unexpected response body.
+   */
   async getVenues({ signal } = {}) {
+    const token = getToken()
+
     let response
     try {
       response = await fetch(`${this.baseUrl}/venues`, {
-        headers: { Accept: 'application/json' },
+        headers: {
+          Accept: 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
         signal,
       })
     } catch (error) {
@@ -90,18 +109,18 @@ class VenueApiClient {
       throw new Error('No fue posible conectar con el servidor.', { cause: error })
     }
 
+    const payload = await response.json().catch(() => null)
+
     if (!response.ok) {
-      throw new Error('No pudimos cargar tus recintos en este momento.')
+      const message = payload?.error || 'No pudimos cargar tus recintos en este momento.'
+      throw new ApiClientError(message, response.status)
     }
 
-    const venues = await response.json().catch(() => {
+    if (!Array.isArray(payload)) {
       throw new Error('El servidor devolvió una respuesta inesperada.')
-    })
-
-    if (!Array.isArray(venues)) {
-      throw new Error('El servidor no devolvió una lista de recintos válida.')
     }
-    return venues
+
+    return payload
   }
 
   /**
