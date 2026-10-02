@@ -7,8 +7,7 @@
 
 import { useEffect, useState } from "react";
 import { useCreateVenue } from "../hooks/useCreateVenue";
-import { SIGN_IN_PATH } from "../auth/constants.js";
-import { goToSignIn } from "../auth/session.js";
+import { ApiClientError } from "../services/VenueApiClient.js";
 import LocationMapPicker from "./LocationMapPicker.jsx";
 import { VenueConfirmation } from "./VenueConfirmation";
 
@@ -37,29 +36,7 @@ export function VenueRegisterForm() {
   const { createVenue, reset, isLoading, isSuccess, isError, error, venue } =
     useCreateVenue();
 
-  // The backend gets the last word, so a 401 sends the person to sign-in...
-  useEffect(() => {
-    if (error?.status === 401) goToSignIn();
-  }, [error]);
-
-  // ...and a 400 can reject a field the client validation was happy with. That
-  // one is derived while rendering instead of stored, and stays visible until
-  // the person edits the field it names (which is what dismisses it).
-  const apiFieldError =
-    isError && error !== dismissedError && error.status === 400 && error.field
-      ? { field: error.field, message: error.message }
-      : null;
-
-  function errorFor(field) {
-    return (
-      fieldErrors[field] ??
-      (apiFieldError?.field === field ? apiFieldError.message : undefined)
-    );
-  }
-
-  function dismissApiFieldError() {
-    setDismissedError(error);
-  }
+  const apiErrorStatus = error instanceof ApiClientError ? error.status : null;
 
   function handleChange(field) {
     return (event) => {
@@ -171,12 +148,17 @@ export function VenueRegisterForm() {
 
         {isError && (
           <p className="form-error form-error--summary" role="alert">
-            {getSubmitErrorMessage(error)}
-            {error.status === 401 && SIGN_IN_PATH && (
+            {apiErrorStatus === 400 ? (
               <>
-                {" "}
-                <a href={SIGN_IN_PATH}>Iniciar sesión</a>
+                <strong>Revisa los datos del recinto.</strong> {error.message}
               </>
+            ) : apiErrorStatus === 403 ? (
+              <>
+                <strong>No tienes permiso para registrar recintos.</strong>{" "}
+                {error.message}
+              </>
+            ) : (
+              error?.message || "No pudimos registrar el recinto en este momento."
             )}
           </p>
         )}
