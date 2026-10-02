@@ -5,7 +5,7 @@
 // treatment — 201 replaces the form with VenueConfirmation, a 400 lands on the
 // input it rejected, a 401 goes to sign-in and a 403 says no.
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useCreateVenue } from "../hooks/useCreateVenue";
 import { ApiClientError } from "../services/VenueApiClient.js";
 import LocationMapPicker from "./LocationMapPicker.jsx";
@@ -22,21 +22,21 @@ function validate(form) {
   return errors;
 }
 
-function getSubmitErrorMessage(error) {
-  if (error.status === 401)
-    return "Tu sesión expiró o no es válida. Vuelve a iniciar sesión para registrar un recinto.";
-  if (error.status === 403) return "No tienes permiso para registrar venues.";
-  return error.message;
-}
-
 export function VenueRegisterForm() {
   const [form, setForm] = useState(initialForm);
   const [fieldErrors, setFieldErrors] = useState({});
-  const [dismissedError, setDismissedError] = useState(null);
   const { createVenue, reset, isLoading, isSuccess, isError, error, venue } =
     useCreateVenue();
 
   const apiErrorStatus = error instanceof ApiClientError ? error.status : null;
+
+  function errorFor(field) {
+    return fieldErrors[field];
+  }
+
+  function dismissApiFieldError() {
+    // No-op for now as API field errors are handled differently
+  }
 
   function handleChange(field) {
     return (event) => {
