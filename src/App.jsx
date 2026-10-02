@@ -3,6 +3,7 @@ import "./App.css";
 import Header from "./components/Header.jsx";
 import MyVenues from "./components/MyVenues.jsx";
 import { VenueRegisterForm } from "./components/VenueRegisterForm.jsx";
+import VenueOwnerRoute from "./components/VenueOwnerRoute.jsx";
 
 function App() {
   const [currentPath, setCurrentPath] = useState(() => window.location.pathname);
@@ -20,7 +21,9 @@ function App() {
       <Header isRegisterRoute={isRegisterRoute} />
       <main className="page-content">
         {isRegisterRoute ? (
-          <VenueRegisterForm />
+          <VenueOwnerRoute>
+            <VenueRegisterForm />
+          </VenueOwnerRoute>
         ) : (
           <>
             <section className="page-intro" aria-labelledby="venues-title">

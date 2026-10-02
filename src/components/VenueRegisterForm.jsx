@@ -1,12 +1,14 @@
-// src/features/venues/components/VenueRegisterForm.jsx
+// src/components/VenueRegisterForm.jsx
 //
-// Task 9: form with client-side validation for name/description/location.
-// Task 11 (VenueConfirmation) renders on success; basic error display is
-// included here as a starting point for task 15, which owns richer
-// error handling (distinguishing 400 vs 403, etc.).
+// "Registrar venue": validates name/description/location on the client, then
+// POSTs them to /venues. Statuses the backend answers with get their own
+// treatment — 201 replaces the form with VenueConfirmation, a 400 lands on the
+// input it rejected, a 401 goes to sign-in and a 403 says no.
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useCreateVenue } from "../hooks/useCreateVenue";
+import { SIGN_IN_PATH } from "../auth/constants.js";
+import { goToSignIn } from "../auth/session.js";
 import LocationMapPicker from "./LocationMapPicker.jsx";
 import { VenueConfirmation } from "./VenueConfirmation";
 
@@ -21,22 +23,56 @@ function validate(form) {
   return errors;
 }
 
+function getSubmitErrorMessage(error) {
+  if (error.status === 401)
+    return "Tu sesión expiró o no es válida. Vuelve a iniciar sesión para registrar un recinto.";
+  if (error.status === 403) return "No tienes permiso para registrar venues.";
+  return error.message;
+}
+
 export function VenueRegisterForm() {
   const [form, setForm] = useState(initialForm);
   const [fieldErrors, setFieldErrors] = useState({});
+  const [dismissedError, setDismissedError] = useState(null);
   const { createVenue, reset, isLoading, isSuccess, isError, error, venue } =
     useCreateVenue();
+
+  // The backend gets the last word, so a 401 sends the person to sign-in...
+  useEffect(() => {
+    if (error?.status === 401) goToSignIn();
+  }, [error]);
+
+  // ...and a 400 can reject a field the client validation was happy with. That
+  // one is derived while rendering instead of stored, and stays visible until
+  // the person edits the field it names (which is what dismisses it).
+  const apiFieldError =
+    isError && error !== dismissedError && error.status === 400 && error.field
+      ? { field: error.field, message: error.message }
+      : null;
+
+  function errorFor(field) {
+    return (
+      fieldErrors[field] ??
+      (apiFieldError?.field === field ? apiFieldError.message : undefined)
+    );
+  }
+
+  function dismissApiFieldError() {
+    setDismissedError(error);
+  }
 
   function handleChange(field) {
     return (event) => {
       setForm((prev) => ({ ...prev, [field]: event.target.value }));
       setFieldErrors((prev) => ({ ...prev, [field]: undefined }));
+      dismissApiFieldError();
     };
   }
 
   function handleLocationChange(address) {
     setForm((prev) => ({ ...prev, location: address }));
     setFieldErrors((prev) => ({ ...prev, location: undefined }));
+    dismissApiFieldError();
   }
 
   async function handleSubmit(event) {
@@ -48,7 +84,11 @@ export function VenueRegisterForm() {
       return;
     }
 
-    await createVenue(form);
+    const createdVenue = await createVenue(form);
+    if (createdVenue) {
+      setForm(initialForm);
+      setFieldErrors({});
+    }
   }
 
   function handleRegisterAnother() {
@@ -92,9 +132,9 @@ export function VenueRegisterForm() {
               value={form.name}
               onChange={handleChange("name")}
             />
-            {fieldErrors.name && (
+            {errorFor("name") && (
               <p className="form-error" role="alert">
-                {fieldErrors.name}
+                {errorFor("name")}
               </p>
             )}
           </div>
@@ -106,9 +146,9 @@ export function VenueRegisterForm() {
               value={form.location}
               onChange={handleLocationChange}
             />
-            {fieldErrors.location && (
+            {errorFor("location") && (
               <p className="form-error" role="alert">
-                {fieldErrors.location}
+                {errorFor("location")}
               </p>
             )}
           </div>
@@ -121,9 +161,9 @@ export function VenueRegisterForm() {
               value={form.description}
               onChange={handleChange("description")}
             />
-            {fieldErrors.description && (
+            {errorFor("description") && (
               <p className="form-error" role="alert">
-                {fieldErrors.description}
+                {errorFor("description")}
               </p>
             )}
           </div>
@@ -131,7 +171,13 @@ export function VenueRegisterForm() {
 
         {isError && (
           <p className="form-error form-error--summary" role="alert">
-            {error?.message}
+            {getSubmitErrorMessage(error)}
+            {error.status === 401 && SIGN_IN_PATH && (
+              <>
+                {" "}
+                <a href={SIGN_IN_PATH}>Iniciar sesión</a>
+              </>
+            )}
           </p>
         )}
 

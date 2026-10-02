@@ -1,9 +1,14 @@
 import useCurrentUser from '../hooks/useCurrentUser.js'
+import { isVenueOwner } from '../auth/session.js'
 
+/**
+ * Renders its children only for a venue owner session. Used for the "Registrar
+ * recinto" links; the route itself is guarded by VenueOwnerRoute.
+ */
 function VenueOwnerOnly({ children, fallback = null }) {
-  const { currentUser, loading } = useCurrentUser()
+  const { currentUser } = useCurrentUser()
 
-  if (loading || currentUser?.role !== 'venue_owner') return fallback
+  if (!isVenueOwner(currentUser)) return fallback
   return children
 }
 
