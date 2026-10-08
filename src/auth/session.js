@@ -1,7 +1,8 @@
 import { CLAIMS, ROLES, SIGN_IN_PATH } from './constants.js'
 import { decodeJwtPayload } from './jwt.js'
-import { getToken } from './token.js'
+import { getToken, persistToken } from './token.js'
 import { getMockSession } from './mockAuth.js'
+import { replaceRoute } from '../navigation.js'
 
 function isExpired(payload) {
   const expiresAt = payload[CLAIMS.EXPIRES_AT]
@@ -58,7 +59,7 @@ export function isVenueOwner(session) {
  * @returns {boolean} True when a redirect was actually performed.
  */
 export function goToSignIn() {
-  if (!SIGN_IN_PATH) return false
-  window.location.assign(SIGN_IN_PATH)
-  return true
+  // A server-rejected token must not immediately send login back to Backstage.
+  persistToken(null)
+  return replaceRoute(SIGN_IN_PATH)
 }

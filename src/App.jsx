@@ -6,9 +6,9 @@ import { VenueRegisterForm } from "./components/VenueRegisterForm.jsx";
 import VenueOwnerRoute from "./components/VenueOwnerRoute.jsx";
 import PartnerSignIn from "./components/PartnerSignIn.jsx";
 import useCurrentUser from "./hooks/useCurrentUser.js";
-import { getPartnerHome } from "./auth/mockAuth.js";
 import { SIGN_IN_PATH, ROLES } from "./auth/constants.js";
 import { replaceRoute } from "./navigation.js";
+import { getSessionRedirect } from "./auth/redirects.js";
 
 function App() {
   const { currentUser } = useCurrentUser();
@@ -22,12 +22,14 @@ function App() {
 
   const isRegisterRoute = currentPath === "/venues/register";
   const isSignInRoute = currentPath === SIGN_IN_PATH;
+  const redirectTo = getSessionRedirect(currentPath, currentUser);
 
   useEffect(() => {
-    if (!currentUser && !isSignInRoute) replaceRoute(SIGN_IN_PATH);
-    else if (currentUser && isSignInRoute) replaceRoute(getPartnerHome(currentUser));
-  }, [currentUser, isSignInRoute]);
+    if (redirectTo) replaceRoute(redirectTo);
+  }, [currentPath, redirectTo]);
 
+  // Do not mount protected views or start their API calls during a redirect.
+  if (redirectTo) return null;
   if (!currentUser) return <PartnerSignIn />;
   if (isSignInRoute) return null;
 

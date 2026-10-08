@@ -43,6 +43,21 @@ credentials matching the Events backend's development partners. Venue API calls
 are unchanged; acceptance of these credentials by Venue Service is not verified
 in this checkout. Existing persisted JWT sessions remain readable.
 
+### Unauthenticated redirects (T-094)
+
+Without a valid session, opening any Backstage path redirects to `/login` before
+protected views mount or issue requests. Malformed credentials, unknown mock IDs,
+and expired JWTs are treated as signed out. Active JWT expiry updates the UI;
+mock sessions have no expiration. An API `401` clears the rejected credential
+before returning to login. Redirects replace browser history and avoid repeating
+the same navigation.
+
+To check manually, sign out and open `/events`, `/venues/register`, and `/` directly.
+Each should show login at `/login`. Sign in, sign out, and press Back: protected
+content must stay unavailable. To test an invalid session, set
+`ds-aster.access-token` to `mock:unknown` in browser localStorage, then reload a
+protected URL. Role-based access for authenticated partners is tracked in T-092.
+
 ---
 
 ## Tech Stack

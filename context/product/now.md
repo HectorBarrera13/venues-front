@@ -18,8 +18,12 @@ and Venue backend changes are outside this work.
 
 **T-098:** `/login` now provides fixed mock accounts and persistent sessions,
 role-based landing destinations, and sign-out. `/events` is currently a placeholder.
-Dedicated route/action guarding and redirect acceptance coverage remain separate
-tickets (#92 and #94). Partner registration (#95/#96) and password-policy validation
+**T-094:** All Backstage paths require a session except `/login`. Direct links and
+history navigation redirect without mounting protected views. Invalid/expired
+sessions return to login, and API rejection clears the credential before redirecting
+to avoid a login loop. Active JWT expiry notifies the UI automatically; mock
+sessions do not expire. Dedicated route/action guarding remains ticket #92.
+Partner registration (#95/#96) and password-policy validation
 (#97) are separate from the mock sign-in form.
 
 ## MVP 01 — Partner registration
