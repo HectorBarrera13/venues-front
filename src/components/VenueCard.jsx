@@ -1,3 +1,6 @@
+import useCurrentUser from '../hooks/useCurrentUser.js'
+import { canManageVenue } from '../auth/access.js'
+
 function formatDate(value) {
   if (!value) return 'Fecha no disponible'
   const date = new Date(value)
@@ -8,6 +11,8 @@ function formatDate(value) {
 }
 
 function VenueCard({ venue, onEdit, onDelete }) {
+  const { currentUser } = useCurrentUser()
+  const canManage = canManageVenue(currentUser, venue)
   return (
     <article className="venue-card">
       <div className="venue-card-header">
@@ -16,7 +21,7 @@ function VenueCard({ venue, onEdit, onDelete }) {
             <path d="M4 20V8l8-4 8 4v12M8 20v-5h8v5M8 10h.01M12 10h.01M16 10h.01" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
         </div>
-        <div className="venue-card-actions">
+        {canManage && <div className="venue-card-actions">
           <button
             type="button"
             className="venue-card-action venue-card-action--edit"
@@ -40,7 +45,7 @@ function VenueCard({ venue, onEdit, onDelete }) {
               <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M10 11v6M14 11v6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           </button>
-        </div>
+        </div>}
       </div>
       <h3>{venue.name || 'Recinto sin nombre'}</h3>
       <p className="venue-location">

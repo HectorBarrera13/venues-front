@@ -1,5 +1,5 @@
 import useCurrentUser from '../hooks/useCurrentUser.js'
-import { isVenueOwner } from '../auth/session.js'
+import { canPerformAction } from '../auth/access.js'
 
 /**
  * Renders its children only for a venue owner session. Used for the "Registrar
@@ -8,7 +8,7 @@ import { isVenueOwner } from '../auth/session.js'
 function VenueOwnerOnly({ children, fallback = null }) {
   const { currentUser } = useCurrentUser()
 
-  if (!isVenueOwner(currentUser)) return fallback
+  if (!canPerformAction(currentUser, 'venues.create')) return fallback
   return children
 }
 

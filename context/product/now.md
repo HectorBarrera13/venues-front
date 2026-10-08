@@ -22,7 +22,15 @@ role-based landing destinations, and sign-out. `/events` is currently a placehol
 history navigation redirect without mounting protected views. Invalid/expired
 sessions return to login, and API rejection clears the credential before redirecting
 to avoid a login loop. Active JWT expiry notifies the UI automatically; mock
-sessions do not expire. Dedicated route/action guarding remains ticket #92.
+sessions do not expire.
+**T-092:** Organizer sessions can access the Events namespace; venue-owner
+sessions can access the Venue namespace. Wrong-role direct links show access denied,
+and unknown pages no longer fall back to Venue views. Venue create/edit/delete UI
+actions are guarded, including handler checks and ownership for existing local
+edit/delete actions. Event create/update permissions are defined for the upcoming
+integration; no Event delete permission exists. Views reset when identity changes,
+and responses from the previous session are discarded. Backend authorization
+remains the owning service's responsibility.
 Partner registration (#95/#96) and password-policy validation
 (#97) are separate from the mock sign-in form.
 

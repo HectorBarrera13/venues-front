@@ -56,7 +56,22 @@ To check manually, sign out and open `/events`, `/venues/register`, and `/` dire
 Each should show login at `/login`. Sign in, sign out, and press Back: protected
 content must stay unavailable. To test an invalid session, set
 `ds-aster.access-token` to `mock:unknown` in browser localStorage, then reload a
-protected URL. Role-based access for authenticated partners is tracked in T-092.
+protected URL.
+
+### Partner role guards (T-092)
+
+Organizers can open Events views; venue owners can open Venue views. Direct links
+to the other role's section display an access-denied panel with a link back to the
+partner's panel. Unknown pages display a not-found panel. Denied views do not mount
+or start API requests. Venue actions are hidden for other roles; existing local
+edit/delete handlers also check ownership. Event create/update permissions are
+defined for the upcoming integration, with deletion excluded.
+
+To check manually, sign in as the organizer and open `/` and `/venues/register`.
+Both should show access denied. Sign in as the owner and open `/events`; it should
+also show access denied. `/unknown` should show page not found for either account.
+The organizer header must not show **Registrar recinto**. Switching accounts
+resets view state so the previous partner's data cannot remain on screen.
 
 ---
 

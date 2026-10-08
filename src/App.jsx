@@ -6,9 +6,11 @@ import { VenueRegisterForm } from "./components/VenueRegisterForm.jsx";
 import VenueOwnerRoute from "./components/VenueOwnerRoute.jsx";
 import PartnerSignIn from "./components/PartnerSignIn.jsx";
 import useCurrentUser from "./hooks/useCurrentUser.js";
-import { SIGN_IN_PATH, ROLES } from "./auth/constants.js";
+import { SIGN_IN_PATH } from "./auth/constants.js";
 import { replaceRoute } from "./navigation.js";
 import { getSessionRedirect } from "./auth/redirects.js";
+import { canAccessRoute, getRouteRole } from "./auth/access.js";
+import { getPartnerHome } from "./auth/mockAuth.js";
 
 function App() {
   const { currentUser } = useCurrentUser();
@@ -23,6 +25,8 @@ function App() {
   const isRegisterRoute = currentPath === "/venues/register";
   const isSignInRoute = currentPath === SIGN_IN_PATH;
   const redirectTo = getSessionRedirect(currentPath, currentUser);
+  const hasAccess = canAccessRoute(currentUser, currentPath);
+  const isKnownView = ["/", "/venues", "/venues/register", "/events"].includes(currentPath);
 
   useEffect(() => {
     if (redirectTo) replaceRoute(redirectTo);
@@ -36,14 +40,27 @@ function App() {
   return (
     <div className="app-shell">
       <Header isRegisterRoute={isRegisterRoute} />
-      <main className="page-content">
-        {currentPath === "/events" ? (
+      <main className="page-content" key={currentUser.token}>
+        {getRouteRole(currentPath) && !hasAccess ? (
+          <section className="state-panel state-panel--error" role="alert">
+            <div className="state-panel-inner">
+              <h1>No tienes acceso a esta sección</h1>
+              <p>Esta sección corresponde a otro tipo de cuenta.</p>
+              <a className="primary-button" href={getPartnerHome(currentUser)}>Volver a mi panel</a>
+            </div>
+          </section>
+        ) : !isKnownView ? (
+          <section className="state-panel">
+            <div className="state-panel-inner">
+              <h1>Página no encontrada</h1>
+              <a className="primary-button" href={getPartnerHome(currentUser)}>Volver a mi panel</a>
+            </div>
+          </section>
+        ) : currentPath === "/events" ? (
           <section className="state-panel" aria-labelledby="events-title">
             <div className="state-panel-inner">
               <h1 id="events-title">Mis eventos</h1>
-              <p>{currentUser.role === ROLES.ORGANIZER
-                ? "Bienvenido a tu espacio de eventos."
-                : "Esta sección está disponible para organizadores."}</p>
+              <p>Bienvenido a tu espacio de eventos.</p>
             </div>
           </section>
         ) : isRegisterRoute ? (

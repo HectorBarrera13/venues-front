@@ -29,6 +29,13 @@ The `venues-front` application is the partner-facing client for the **Venues and
 
 Reuse the shared header and mock identity store, and add an Events API client under `src/services/` with event workflow hooks under `src/hooks/`.
 
+Backstage uses `src/auth/access.js` for route and action permissions. Organizer
+sessions can enter the Events namespace, and venue-owner sessions can enter the
+Venue namespace. The root route checks access before mounting a view; denied and
+unknown paths have dedicated states. View state is keyed to the current credential
+and discarded on session changes. These checks control the interface; owning
+services continue authorizing every HTTP request.
+
 - Registration collects name, artist, date, and a venue from **all registered venues**, refreshed when the form opens. Do not use the owner-filtered “Mis recintos” list.
 - Submit to `POST /api/v1/events` and show the returned confirmation. Events requires UUID references, snake_case fields, and a future RFC 3339 timestamp; agree date/timezone conversion for the calendar-date input.
 - Event reads return dates in `schedules` and only a `venue_id`; resolve venue name/location from the catalogue when needed.
