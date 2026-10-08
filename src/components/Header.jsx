@@ -1,6 +1,9 @@
 import useCurrentUser from '../hooks/useCurrentUser.js'
-import { ROLES } from '../auth/constants.js'
+import { ROLES, SIGN_IN_PATH } from '../auth/constants.js'
 import VenueOwnerOnly from './VenueOwnerOnly.jsx'
+import { persistToken } from '../auth/token.js'
+import { getPartnerHome } from '../auth/mockAuth.js'
+import { replaceRoute } from '../navigation.js'
 
 function getInitials(name = '') {
   return name.split(' ').filter(Boolean).slice(0, 2).map((part) => part[0]).join('').toUpperCase()
@@ -12,12 +15,14 @@ function Header({ isRegisterRoute = typeof window !== 'undefined' && window.loca
   return (
     <header className="site-header">
       <div className="header-inner">
-        <a className="brand" href="/" aria-label="Venues, inicio">
+        <a className="brand" href={getPartnerHome(currentUser)} aria-label="Backstage, inicio">
           <span className="brand-mark" aria-hidden="true">V</span>
-          <span className="brand-name">Venues</span>
+          <span className="brand-name">Backstage</span>
         </a>
         <nav className="main-nav" aria-label="Navegación principal">
-          <a href="/" aria-current={!isRegisterRoute ? 'page' : undefined}>Mis recintos</a>
+          <a href={getPartnerHome(currentUser)} aria-current={!isRegisterRoute ? 'page' : undefined}>
+            {currentUser?.role === ROLES.ORGANIZER ? 'Mis eventos' : 'Mis recintos'}
+          </a>
         </nav>
         {currentUser && (
           <div className="user-summary" aria-label={`Sesión de ${currentUser.name}`}>
@@ -40,6 +45,10 @@ function Header({ isRegisterRoute = typeof window !== 'undefined' && window.loca
             </a>
           </VenueOwnerOnly>
         )}
+        <button className="sign-out-button" type="button" onClick={() => {
+          persistToken(null)
+          replaceRoute(SIGN_IN_PATH)
+        }}>Cerrar sesión</button>
       </div>
     </header>
   )

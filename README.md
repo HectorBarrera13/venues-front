@@ -28,7 +28,20 @@ The Venues domain is maintained by **Team SubAgentes** and the Events domain by 
 
 ---
 
-The current MVP uses mocked authentication. See [context/product/now.md](context/product/now.md) for requirements and exclusions. Existing edit/delete actions affect local state only.
+The current MVP uses mocked authentication. See [context/product/now.md](context/product/now.md) for requirements and exclusions. Existing venue edit/delete actions affect local state only.
+
+### Mock partner sign-in (T-098)
+
+Open `/login`. Use `organizer@example.com` or `owner@example.com`, with password
+`Backstage123!` for either account. The account determines the role; there is no
+role selector. Organizers land on `/events` (a placeholder until Events integration)
+and owners land on the existing Venue screen at `/`.
+
+The session survives reloads. **Cerrar sesión** clears it and returns to login.
+No Auth service requests are made. These frontend fixtures produce `mock:<uuid>`
+credentials matching the Events backend's development partners. Venue API calls
+are unchanged; acceptance of these credentials by Venue Service is not verified
+in this checkout. Existing persisted JWT sessions remain readable.
 
 ---
 
@@ -100,7 +113,7 @@ npm run preview
 | Build | `npm run build` | Compiles production assets into `dist/` |
 | Preview | `npm run preview` | Serves the production build locally |
 | Lint | `npm run lint` | Runs ESLint across all source files |
-| Test | `npm test` | Currently skips tests; no test runner is configured |
+| Test | `npm test` | Runs authentication tests with the built-in Node.js test runner |
 
 ---
 

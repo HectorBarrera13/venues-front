@@ -18,19 +18,8 @@ export const CLAIMS = Object.freeze({
   EMAIL: 'email',
 })
 
-/**
- * Provisional token source: nothing stores the token yet (the auth team's work
- * is not in this repo), so until it lands, setToken() / localStorage under this
- * key / VITE_DEV_TOKEN are the only ways a session exists here.
- */
+/** Token persisted by the frontend mock login. */
 export const TOKEN_STORAGE_KEY = 'ds-aster.access-token'
 
-/**
- * Where the app sends people whose session is missing or expired.
- *
- * Empty on purpose: the sign-in screen belongs to the auth team and does not
- * exist yet, so navigating would dead-end. While it is empty the screens show
- * the "sesión expiró" message instead of redirecting; set it to '/sign-in'
- * (and only that) once that route lands and every redirect starts working.
- */
-export const SIGN_IN_PATH = ''
+/** Entry point for partners without a session. */
+export const SIGN_IN_PATH = '/login'

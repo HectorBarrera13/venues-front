@@ -4,8 +4,14 @@ import Header from "./components/Header.jsx";
 import MyVenues from "./components/MyVenues.jsx";
 import { VenueRegisterForm } from "./components/VenueRegisterForm.jsx";
 import VenueOwnerRoute from "./components/VenueOwnerRoute.jsx";
+import PartnerSignIn from "./components/PartnerSignIn.jsx";
+import useCurrentUser from "./hooks/useCurrentUser.js";
+import { getPartnerHome } from "./auth/mockAuth.js";
+import { SIGN_IN_PATH, ROLES } from "./auth/constants.js";
+import { replaceRoute } from "./navigation.js";
 
 function App() {
+  const { currentUser } = useCurrentUser();
   const [currentPath, setCurrentPath] = useState(() => window.location.pathname);
 
   useEffect(() => {
@@ -15,12 +21,30 @@ function App() {
   }, []);
 
   const isRegisterRoute = currentPath === "/venues/register";
+  const isSignInRoute = currentPath === SIGN_IN_PATH;
+
+  useEffect(() => {
+    if (!currentUser && !isSignInRoute) replaceRoute(SIGN_IN_PATH);
+    else if (currentUser && isSignInRoute) replaceRoute(getPartnerHome(currentUser));
+  }, [currentUser, isSignInRoute]);
+
+  if (!currentUser) return <PartnerSignIn />;
+  if (isSignInRoute) return null;
 
   return (
     <div className="app-shell">
       <Header isRegisterRoute={isRegisterRoute} />
       <main className="page-content">
-        {isRegisterRoute ? (
+        {currentPath === "/events" ? (
+          <section className="state-panel" aria-labelledby="events-title">
+            <div className="state-panel-inner">
+              <h1 id="events-title">Mis eventos</h1>
+              <p>{currentUser.role === ROLES.ORGANIZER
+                ? "Bienvenido a tu espacio de eventos."
+                : "Esta sección está disponible para organizadores."}</p>
+            </div>
+          </section>
+        ) : isRegisterRoute ? (
           <VenueOwnerRoute>
             <VenueRegisterForm />
           </VenueOwnerRoute>

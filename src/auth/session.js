@@ -1,6 +1,7 @@
 import { CLAIMS, ROLES, SIGN_IN_PATH } from './constants.js'
 import { decodeJwtPayload } from './jwt.js'
 import { getToken } from './token.js'
+import { getMockSession } from './mockAuth.js'
 
 function isExpired(payload) {
   const expiresAt = payload[CLAIMS.EXPIRES_AT]
@@ -23,22 +24,26 @@ function pickDisplayName(payload) {
  * match on ownerId), `role` and `name`.
  *
  * @returns {{ token: string, userId: string | null, role: string | null, name: string } | null}
- *   null when there is no token, it isn't a JWT, or it's past its `exp`.
+ *   null for missing/unknown mock credentials or invalid/expired JWTs.
  */
 export function getSession() {
   const token = getToken()
   if (!token) return null
+
+  if (token.startsWith('mock:')) return getMockSession(token)
 
   const payload = decodeJwtPayload(token)
   if (!payload || isExpired(payload)) return null
 
   const userId = payload[CLAIMS.USER_ID]
   const role = payload[CLAIMS.ROLE]
+  if (typeof userId !== 'string' || !userId.trim()) return null
+  if (role !== ROLES.VENUE_OWNER && role !== ROLES.ORGANIZER) return null
 
   return Object.freeze({
     token,
-    userId: typeof userId === 'string' && userId ? userId : null,
-    role: role === ROLES.VENUE_OWNER || role === ROLES.ORGANIZER ? role : null,
+    userId,
+    role,
     name: pickDisplayName(payload),
   })
 }
@@ -48,9 +53,7 @@ export function isVenueOwner(session) {
 }
 
 /**
- * Sends the browser to sign-in, but only once that route exists (see
- * SIGN_IN_PATH). Until then callers are expected to show the "sesión expiró"
- * message, so returning false here is the signal to do that.
+ * Sends the browser to the partner login screen.
  *
  * @returns {boolean} True when a redirect was actually performed.
  */

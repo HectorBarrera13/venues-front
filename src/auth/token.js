@@ -4,11 +4,11 @@ import { TOKEN_STORAGE_KEY } from './constants.js'
 // where the token lives is a one-file decision. In order of preference:
 // 1. setToken() — in-memory, so a session can be swapped without a reload
 // 2. localStorage — survives the reload, the usual shape for a stored session
-// 3. VITE_DEV_TOKEN — dev-only fallback for trying out a token from the backend
-// Nothing here builds, refreshes or validates a session: that is the auth
-// team's job, and an expired/invalid token simply fails here and at the API.
+// Login persists the selected mock credential. No automatic development-token
+// fallback: signing out must also survive a page reload.
 
-let tokenInMemory = null
+// Undefined means no override; null explicitly means signed out.
+let tokenInMemory
 const listeners = new Set()
 
 function emitChange() {
@@ -23,11 +23,6 @@ function readStoredToken() {
   }
 }
 
-function readDevToken() {
-  const devToken = import.meta.env.VITE_DEV_TOKEN
-  return typeof devToken === 'string' && devToken.trim() ? devToken.trim() : null
-}
-
 function normalize(token) {
   return typeof token === 'string' && token.trim() ? token.trim() : null
 }
@@ -36,7 +31,8 @@ function normalize(token) {
  * @returns {string | null} The raw access token, or null when there is none.
  */
 export function getToken() {
-  return normalize(tokenInMemory ?? readStoredToken() ?? readDevToken())
+  if (tokenInMemory !== undefined) return tokenInMemory
+  return normalize(readStoredToken())
 }
 
 /**

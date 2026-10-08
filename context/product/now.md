@@ -11,6 +11,17 @@ Both source documents are marked Draft, version 1.0. Their contents are product 
 
 **Current user decisions:** Events and Venues share this frontend. Authentication is mocked for this integration stage. The PRDs describe JWT-based partner access; that production integration is deferred rather than considered implemented.
 
+**Current implementation scope:** Events supports create, read, and update (CRU);
+deletion is excluded. Frontend login is mocked, with organizers routed to Events
+and venue owners routed to the existing Venue screen. Auth Service integration
+and Venue backend changes are outside this work.
+
+**T-098:** `/login` now provides fixed mock accounts and persistent sessions,
+role-based landing destinations, and sign-out. `/events` is currently a placeholder.
+Dedicated route/action guarding and redirect acceptance coverage remain separate
+tickets (#92 and #94). Partner registration (#95/#96) and password-policy validation
+(#97) are separate from the mock sign-in form.
+
 ## MVP 01 — Partner registration
 
 - Owners register a venue with mandatory name, description and free-text location.
@@ -37,7 +48,7 @@ Reviewed Events backend: `dsaster-event-management`, local `testing` checkout at
 
 - POST registration, listing and detail retrieval exist; frontend Events integration is pending.
 - Registration creates the event and schedule in a database transaction and returns `201` confirmation.
-- Organizer identity is currently optional request data with a fixed fallback; align this with a backend mock provider.
+- Event creation derives organizer identity from `Bearer mock:<partner-uuid>` and rejects non-organizers; there is no request-body identity fallback in the current checkout.
 - Real venue validation exists, but permissive mock validation is enabled by default. Verify the actual Venue API path and disable that mock for integration acceptance.
 - Name search and synchronization to Search are not implemented in the inspected Events code.
 - Reads provide venue IDs, not venue names/locations; enrich from the venue catalogue or agree an upstream projection.
@@ -46,7 +57,7 @@ Reviewed Events backend: `dsaster-event-management`, local `testing` checkout at
 
 ## Explicitly excluded
 
-Seat maps, sections, rows, seats, capacity, categories, prices, on-sale scheduling, editing/deletion, media, analytics, payments, queues, holds/countdowns, email delivery, QR codes, fan accounts and ticket recovery after leaving confirmation are outside these MVPs.
+Seat maps, sections, rows, seats, capacity, categories, prices, on-sale scheduling, event deletion, venue editing/deletion, media, analytics, payments, queues, holds/countdowns, email delivery, QR codes, fan accounts and ticket recovery after leaving confirmation are outside this implementation. Event updating is explicitly included by the current user decision.
 
 ## Next frontend work
 
