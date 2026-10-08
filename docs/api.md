@@ -4,7 +4,7 @@ This document outlines the API Venue contracts consumed by `venues-front` and Ev
 
 ## Overview
 
-The shared frontend integrates with `venue-service` and `dsaster-event-management`, directly or through the platform gateway. Events frontend integration is pending; `VITE_API_BASE_URL` currently configures only the Venue client.
+The shared frontend integrates with `venue-service` and `dsaster-event-management`, directly or through the platform gateway. Event registration is connected. `VITE_API_BASE_URL` configures Venue; `VITE_EVENTS_API_BASE_URL` configures the Events origin, with `/api/v1/events` appended by the client.
 
 - OpenAPI Specification: Maintained in the `venue-service` repository and published as `openapi.yml` with backend releases.
 
@@ -53,7 +53,7 @@ Registers a new physical venue under the authenticated partner.
 - Headers:
   - `Content-Type: application/json`
   - `Accept: application/json`
-  - `x-mock-user: <userId>` (current frontend mock); `Authorization: Bearer <jwt-token>` for future JWT integration
+  - `Authorization: Bearer <token>` (existing Venue client behavior)
 
 #### Request Body
 
@@ -66,7 +66,7 @@ Registers a new physical venue under the authenticated partner.
 ```
 
 > [!NOTE]
-> `ownerId` and user roles are not accepted in the request payload. The current frontend sends mock identity in the `x-mock-user` header. The Venue backend has not been inspected; verified JWT attribution is the future contract.
+> The frontend does not submit `ownerId` or roles in the payload. It sends a bearer credential. Venue backend validation and acceptance of the current mock token have not been verified.
 
 #### Responses
 
@@ -81,7 +81,7 @@ Registers a new physical venue under the authenticated partner.
 
 - Method: `POST`
 - Path: `/api/v1/events` (runtime alias: `/events`)
-- Headers: `Content-Type: application/json`, `Accept: application/json`
+- Headers: `Content-Type: application/json`, `Accept: application/json`, `Authorization: Bearer mock:<partner-uuid>` for the current Events mock verifier.
 
 #### Request Body
 
@@ -96,12 +96,17 @@ Registers a new physical venue under the authenticated partner.
 
 Name and artist must be nonblank; date must be a future RFC 3339 timestamp; venue must be a UUID (`venueId` is also accepted). Optional fields are `description`, `terms`, `event_type` (default `Concert`), and `age_policy` (default `All ages`).
 
-The backend currently accepts optional `organizer_id` (`organizerId` alias), or defaults to `00000000-0000-0000-0000-000000000001`. It does not verify auth. Identity must not be entered in the form; align it with the agreed backend mock provider.
+The backend resolves the organizer from the bearer token and requires the organizer
+role. It has no request-body identity fallback. The frontend submits only name,
+artist, UTC date/time, and venue ID.
 
 #### Responses
 
 - `201 Created`: Event and schedule are stored atomically. Confirmation includes `id`, `message`, `name`, `artist`, `date`, `venue_id`, `status` (`Scheduled`), and `created_at`.
-- `400 Bad Request`: Service validation failure or nonexistent venue, with `{ "error": "..." }`.
+- `400 Bad Request`: Blank name/artist or a non-future date, with `{ "error": "..." }`.
+- `401 Unauthorized`: Missing/invalid token or an unknown partner.
+- `403 Forbidden`: Authenticated partner is not an organizer.
+- `422 Unprocessable Entity`: Venue is nonexistent/invalid (or payload extraction fails).
 - `500 Internal Server Error`: Server/database failure.
 
 Missing fields or malformed date/UUID values are rejected by Axum extraction; their response format needs alignment with the documented JSON errors. The PRD requires a valid calendar date, so the additional future-timestamp restriction also needs alignment.

@@ -38,19 +38,44 @@ async function loadComponent(name) {
 global.window = { localStorage: { setItem() {}, removeItem() {}, getItem() { return null } } }
 const Header = await loadComponent('Header')
 const VenueCard = await loadComponent('VenueCard')
+const EventRegisterForm = await loadComponent('EventRegisterForm')
 const render = (Component, props) => renderToStaticMarkup(createElement(Component, props))
 
 test('header follows the active role and hides owner actions from organizers', () => {
   persistToken(authenticateMockPartner('organizer@example.com', 'Backstage123!'))
   const organizerHeader = render(Header, { isRegisterRoute: false })
   assert.match(organizerHeader, /Mis eventos/)
+  assert.match(organizerHeader, /Registrar evento/)
   assert.doesNotMatch(organizerHeader, /Registrar recinto|Mis recintos/)
   persistToken(authenticateMockPartner('owner@example.com', 'Backstage123!'))
   const ownerHeader = render(Header, { isRegisterRoute: false })
   assert.match(ownerHeader, /Mis recintos/)
   assert.match(ownerHeader, /Registrar recinto/)
   assert.doesNotMatch(ownerHeader, /Mis eventos/)
+  assert.doesNotMatch(ownerHeader, /Registrar evento/)
   persistToken(null)
+})
+
+test('event form shows the complete supplied venue catalogue and handles unavailable states', () => {
+  const props = {
+    catalogue: { venues: [{ id: 'venue-a', name: 'Arena A', ownerId: 'owner-a' }, { id: 'venue-b', name: 'Arena B', ownerId: 'owner-b' }], loading: false, error: '' },
+    submission: { pending: false, fields: {}, error: '', confirmation: null },
+    onSubmit() {}, onReload() {},
+  }
+  const html = render(EventRegisterForm, props)
+  assert.match(html, /Arena A/)
+  assert.match(html, /Arena B/)
+  assert.match(html, /datetime-local/)
+  assert.doesNotMatch(html, /name="organizer_id"|name="role"/)
+  assert.match(render(EventRegisterForm, { ...props, catalogue: { venues: [], loading: true, error: '' } }), /Cargando recintos/)
+  assert.match(render(EventRegisterForm, { ...props, catalogue: { venues: [], loading: false, error: 'Catálogo no disponible' } }), /Reintentar catálogo/)
+  assert.match(render(EventRegisterForm, { ...props, catalogue: { venues: [], loading: false, error: '' } }), /Aún no hay recintos/)
+  assert.match(render(EventRegisterForm, { ...props, submission: { ...props.submission, pending: true } }), /Registrando/)
+  const confirmed = render(EventRegisterForm, { ...props, submission: { ...props.submission, confirmation: { name: 'Stored event', artist: 'Muse', date: '2099-12-01T20:00:00Z', venue_id: 'venue-b' } } })
+  assert.match(confirmed, /Evento registrado/)
+  assert.match(confirmed, /Stored event/)
+  assert.match(confirmed, /Arena B/)
+  assert.doesNotMatch(confirmed, /<form/)
 })
 
 test('actual venue cards show mutation controls only to their current owner', () => {

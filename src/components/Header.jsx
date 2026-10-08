@@ -4,6 +4,7 @@ import VenueOwnerOnly from './VenueOwnerOnly.jsx'
 import { persistToken } from '../auth/token.js'
 import { getPartnerHome } from '../auth/mockAuth.js'
 import { replaceRoute } from '../navigation.js'
+import { canPerformAction } from '../auth/access.js'
 
 function getInitials(name = '') {
   return name.split(' ').filter(Boolean).slice(0, 2).map((part) => part[0]).join('').toUpperCase()
@@ -44,6 +45,9 @@ function Header({ isRegisterRoute = typeof window !== 'undefined' && window.loca
               Registrar recinto
             </a>
           </VenueOwnerOnly>
+        )}
+        {!isRegisterRoute && canPerformAction(currentUser, 'events.create') && (
+          <a className="primary-button primary-button--light" href="/events/register">Registrar evento</a>
         )}
         <button className="sign-out-button" type="button" onClick={() => {
           persistToken(null)

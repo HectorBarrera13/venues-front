@@ -9,6 +9,10 @@ export default defineConfig({
   },
   server: {
     proxy: {
+      '/events-api': {
+        target: 'http://localhost:3000',
+        rewrite: (path) => path.replace(/^\/events-api/, ''),
+      },
       '/api': {
         target: 'http://localhost:3000',
         rewrite: (path) => path.replace(/^\/api/, ''),

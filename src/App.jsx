@@ -11,6 +11,7 @@ import { replaceRoute } from "./navigation.js";
 import { getSessionRedirect } from "./auth/redirects.js";
 import { canAccessRoute, getRouteRole } from "./auth/access.js";
 import { getPartnerHome } from "./auth/mockAuth.js";
+import EventRegisterPage from "./components/EventRegisterPage.jsx";
 
 function App() {
   const { currentUser } = useCurrentUser();
@@ -22,11 +23,11 @@ function App() {
     return () => window.removeEventListener("popstate", handleLocationChange);
   }, []);
 
-  const isRegisterRoute = currentPath === "/venues/register";
+  const isRegisterRoute = currentPath === "/venues/register" || currentPath === "/events/register";
   const isSignInRoute = currentPath === SIGN_IN_PATH;
   const redirectTo = getSessionRedirect(currentPath, currentUser);
   const hasAccess = canAccessRoute(currentUser, currentPath);
-  const isKnownView = ["/", "/venues", "/venues/register", "/events"].includes(currentPath);
+  const isKnownView = ["/", "/venues", "/venues/register", "/events", "/events/register"].includes(currentPath);
 
   useEffect(() => {
     if (redirectTo) replaceRoute(redirectTo);
@@ -61,8 +62,11 @@ function App() {
             <div className="state-panel-inner">
               <h1 id="events-title">Mis eventos</h1>
               <p>Bienvenido a tu espacio de eventos.</p>
+              <a className="primary-button" href="/events/register">Registrar evento</a>
             </div>
           </section>
+        ) : currentPath === "/events/register" ? (
+          <EventRegisterPage />
         ) : isRegisterRoute ? (
           <VenueOwnerRoute>
             <VenueRegisterForm />

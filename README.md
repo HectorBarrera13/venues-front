@@ -23,7 +23,7 @@ The Venues domain is maintained by **Team SubAgentes** and the Events domain by 
 - **Interactive Map Picker**: Leaflet and OpenStreetMap integration for bidirectional geocoding (click-to-pin and debounced search via Nominatim).
 - **Registration & Editing**: Form validation for venue details with in-place modal editing.
 - **Role-Based Guards**: UI boundaries restricting venue mutations to the `venue_owner` role.
-- **Events Integration (Pending)**: The Events backend supports registration, paginated listing, and detail retrieval. Frontend registration will collect name, artist, date, and a venue selected from the complete catalogue.
+- **Event Registration**: Organizers register events with name, artist, a future date/time, and a venue selected from the refreshed catalogue. Events listing, details, and update screens remain pending.
 - **Resilient API Handling**: Typed client errors separating validation (400) and authorization (403) failures.
 
 ---
@@ -73,6 +73,26 @@ also show access denied. `/unknown` should show page not found for either accoun
 The organizer header must not show **Registrar recinto**. Switching accounts
 resets view state so the previous partner's data cannot remain on screen.
 
+### Event registration (T-091)
+
+Sign in as `organizer@example.com` and choose **Registrar evento**, or open
+`/events/register`. The form requests the existing Venue catalogue each time it
+opens, without applying the owner filter used by “Mis recintos”. The Venue service
+must expose the complete catalogue to the organizer; that backend behavior and
+acceptance of the current mock token are still unverified. Catalogue errors and
+empty results disable submission instead of supplying fake venue records.
+
+Enter a future date/time in the displayed browser timezone. The frontend converts
+it to UTC and sends `POST /api/v1/events`, with the session bearer token and no
+organizer identity in the body. Venue IDs must be UUIDs. Success displays the
+server's `201` confirmation; errors preserve the form and allow retry. Repeated
+clicks while a request is pending are blocked. The API has no idempotency key, so
+this does not guarantee deduplication after an interrupted response or manual retry.
+
+For local testing, run Events on port 3000 and configure `VITE_API_BASE_URL` for
+your Venue service. Leave `VITE_EVENTS_API_BASE_URL` empty to use the separate
+`/events-api` development proxy, or set it to the Events service origin.
+
 ---
 
 ## Tech Stack
@@ -117,8 +137,11 @@ cp .env.example .env
 | Variable | Description | Default |
 |---|---|---|
 | `VITE_API_BASE_URL` | Base URL for the venue-service API or gateway | `/api` |
+| `VITE_EVENTS_API_BASE_URL` | Events service origin (without `/api/v1/events`) | `/events-api` |
 
-`VITE_API_BASE_URL` currently configures only the Venue client. Events will need a separate service URL or gateway route; no Events client/configuration exists yet. The existing `/api` development proxy has a single upstream.
+`VITE_API_BASE_URL` configures the existing Venue client. Events uses a separate
+client and `/events-api` development proxy that preserves `/api/v1/events`.
+Production hosting must configure that proxy or supply an Events origin with CORS.
 
 ### Running Locally
 

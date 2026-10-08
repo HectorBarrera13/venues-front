@@ -682,6 +682,7 @@
   font-weight: 800;
 }
 .form-field input,
+.form-field select,
 .form-field textarea {
   width: 100%;
   border: 1px solid #cbd8e8;
@@ -705,6 +706,7 @@
   color: #91a0b5;
 }
 .form-field input:focus,
+.form-field select:focus,
 .form-field textarea:focus {
   border-color: #1674df;
   background: #fff;

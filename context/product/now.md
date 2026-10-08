@@ -34,6 +34,14 @@ remains the owning service's responsibility.
 Partner registration (#95/#96) and password-policy validation
 (#97) are separate from the mock sign-in form.
 
+**T-091:** Organizer event registration now lives at `/events/register`, with
+refreshed Venue catalogue loading, required-field/calendar/future-time/UUID
+validation, separate Events client configuration, and POST confirmation. Dates
+are entered with an explicit time in the displayed browser timezone and sent as
+UTC timestamps to match the existing backend. The frontend does not filter the
+catalogue by owner. Venue backend catalogue visibility and credential acceptance
+remain unverified. Events listing/details/update integration remains pending.
+
 ## MVP 01 — Partner registration
 
 - Owners register a venue with mandatory name, description and free-text location.
@@ -58,7 +66,7 @@ Search is owned by Error200; Booking by Sap-atitos. Their repositories/contracts
 
 Reviewed Events backend: `dsaster-event-management`, local `testing` checkout at `10fba4d`, including working-tree OpenAPI updates.
 
-- POST registration, listing and detail retrieval exist; frontend Events integration is pending.
+- POST registration, listing and detail retrieval exist; frontend registration is connected, while listing/detail/update screens remain pending.
 - Registration creates the event and schedule in a database transaction and returns `201` confirmation.
 - Event creation derives organizer identity from `Bearer mock:<partner-uuid>` and rejects non-organizers; there is no request-body identity fallback in the current checkout.
 - Real venue validation exists, but permissive mock validation is enabled by default. Verify the actual Venue API path and disable that mock for integration acceptance.
@@ -73,4 +81,7 @@ Seat maps, sections, rows, seats, capacity, categories, prices, on-sale scheduli
 
 ## Next frontend work
 
-Implement shared partner navigation/mock identity, organizer event registration with a fresh complete venue catalogue, Events client configuration and registration confirmation. Use [the API reference](../../docs/api.md) for available backend contracts. Resolve backend integration gaps separately; do not invent Search or Booking endpoints.
+Verify live Venue catalogue access and Event registration, then implement organizer
+event listing, details and updating. Use [the API reference](../../docs/api.md) for
+available backend contracts. Resolve backend integration gaps separately; do not
+invent Search or Booking endpoints.
