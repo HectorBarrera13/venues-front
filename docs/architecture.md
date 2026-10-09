@@ -11,7 +11,7 @@ The `venues-front` application is the partner-facing client for the **Venues and
 - Enables Venue Owners to register physical spaces, maintain metadata, edit venue profiles, and select geographical coordinates on an interactive map.
 - Consumes the venue catalogue and registration endpoints exposed by `venue-service` (Team SubAgentes).
 
-- Consumes event registration from `dsaster-event-management` (Team Aura); listing, detail, and updating integration remains pending.
+- Consumes event registration and organizer listing from `dsaster-event-management` (Team Aura); detail and updating integration remains pending.
 - Uses mocked authentication for the current MVP. See [active requirements](../context/product/now.md).
 
 ### Layer Responsibilities
@@ -48,6 +48,7 @@ The frontend neither signs JWTs nor calls Auth to obtain them in this stage.
 - Registration collects name, artist, date, and a venue from **all registered venues**, refreshed when the form opens. Do not use the owner-filtered “Mis recintos” list.
 - Submit to `POST /api/v1/events` and show the returned confirmation. Events requires UUID references, snake_case fields, and a future RFC 3339 timestamp. The form collects local date/time, displays the browser timezone, and converts to UTC.
 - Event reads return dates in `schedules` and only a `venue_id`; resolve venue name/location from the catalogue when needed.
+- Organizer listing uses `useOrganizerEvents` and a presentational `OrganizerEventList`. Events and Venue catalogue requests run independently with cancellation and session/request keys. Unavailable venue metadata does not prevent listing events. Page-size changes reset pagination, and no previous-session rows are shown during loading.
 - The Events backend derives organizer identity from its mock bearer credential. Identity is absent from registration form inputs and request bodies.
 - Configure separate service URLs or gateway routes. Real venue validation requires disabling the Events permissive venue mock and verifying its Venue API path.
 

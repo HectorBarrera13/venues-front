@@ -18,7 +18,7 @@ and venue owners routed to the existing Venue screen. Auth Service integration
 and Venue backend changes are outside this work.
 
 **T-098:** `/login` now provides fixed mock accounts and persistent sessions,
-role-based landing destinations, and sign-out. `/events` is currently a placeholder.
+role-based landing destinations, and sign-out.
 **T-098 compatibility follow-up:** The original `VITE_DEV_TOKEN` JWT source is
 restored. Venue calls use a supplied JWT independently of the Events mock token;
 mock credentials are not sent to Venue. Owner demo login uses the configured
@@ -59,7 +59,14 @@ validation, separate Events client configuration, and POST confirmation. Dates
 are entered with an explicit time in the displayed browser timezone and sent as
 UTC timestamps to match the existing backend. The frontend does not filter the
 catalogue by owner. Venue backend catalogue visibility and credential acceptance
-remain unverified. Events listing/details/update integration remains pending.
+remain unverified. Events details/update integration remains pending.
+
+**T-147:** `/events` now lists the current organizer's events with pagination,
+metadata/status/date display, independently loaded venue names, and loading/empty/
+retry states. Requests are cancelled on navigation/session changes, with old data
+hidden while the new request is pending. Cards link to the forthcoming T-148 detail
+route. Live browser verification is pending because localhost:5173 was unreachable
+and the agent environment could not bind a development-server port.
 
 ## MVP 01 — Partner registration
 
@@ -85,7 +92,7 @@ Search is owned by Error200; Booking by Sap-atitos. Their repositories/contracts
 
 Reviewed Events backend: `dsaster-event-management`, local `testing` checkout at `10fba4d`, including working-tree OpenAPI updates.
 
-- POST registration, listing and detail retrieval exist; frontend registration is connected, while listing/detail/update screens remain pending.
+- POST registration, listing and detail retrieval exist; frontend registration and listing are connected, while detail/update screens remain pending.
 - Registration creates the event and schedule in a database transaction and returns `201` confirmation.
 - Event creation derives organizer identity from `Bearer mock:<partner-uuid>` and rejects non-organizers; there is no request-body identity fallback in the current checkout.
 - Real venue validation exists, but permissive mock validation is enabled by default. Verify the actual Venue API path and disable that mock for integration acceptance.
@@ -101,6 +108,6 @@ Seat maps, sections, rows, seats, capacity, categories, prices, on-sale scheduli
 ## Next frontend work
 
 Verify live Venue catalogue access and Event registration, then implement organizer
-event listing, details and updating. Use [the API reference](../../docs/api.md) for
+event details and updating. Use [the API reference](../../docs/api.md) for
 available backend contracts. Resolve backend integration gaps separately; do not
 invent Search or Booking endpoints.

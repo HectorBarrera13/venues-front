@@ -41,7 +41,40 @@ const VenueCard = await loadComponent('VenueCard')
 const EventRegisterForm = await loadComponent('EventRegisterForm')
 const PartnerRegister = await loadComponent('PartnerRegister')
 const PartnerSignIn = await loadComponent('PartnerSignIn')
+const OrganizerEventList = await loadComponent('OrganizerEventList')
 const render = (Component, props) => renderToStaticMarkup(createElement(Component, props))
+
+test('event list renders metadata, venue names, pagination and future detail links', () => {
+  const props = {
+    events: [{ id: 'event-a', name: 'Muse Tour', artist: 'Muse', status: 'Scheduled', venue_id: 'venue-a', schedules: [{ id: 'schedule', starts_at: '2099-12-01T20:00:00Z' }] }],
+    venues: [{ id: 'venue-a', name: 'Arena A' }], page: 2, totalPages: 3, totalItems: 25,
+  }
+  const html = render(OrganizerEventList, props)
+  for (const text of ['Muse Tour', 'Muse', 'Programado', 'Arena A', 'Página 2 de 3', '25 eventos']) assert.ok(html.includes(text))
+  assert.match(html, /dateTime="2099-12-01T20:00:00Z"/)
+  assert.match(html, /href="\/events\/event-a"/)
+  assert.match(html, /href="\/events\/register"/)
+  assert.doesNotMatch(html, /disabled=""/)
+  const firstPage = render(OrganizerEventList, { ...props, page: 1 })
+  assert.match(firstPage, /disabled="">Anterior/)
+  const lastPage = render(OrganizerEventList, { ...props, page: 3 })
+  assert.match(lastPage, /disabled="">Siguiente/)
+})
+
+test('list handles loading, failure, empty and missing venue states independently', () => {
+  assert.match(render(OrganizerEventList, { loading: true }), /Cargando eventos/)
+  assert.match(render(OrganizerEventList, { error: 'Offline' }), /Reintentar/)
+  assert.match(render(OrganizerEventList), /Aún no tienes eventos/)
+  const props = { events: [{ id: 'event-a', name: 'Concert', status: 'Scheduled', venue_id: 'missing', schedules: [] }], venueError: 'Catálogo no disponible' }
+  const html = render(OrganizerEventList, props)
+  assert.match(html, /Concert/)
+  assert.match(html, /Recinto no disponible/)
+  assert.match(html, /Fecha por confirmar/)
+  assert.match(html, /Reintentar recintos/)
+  assert.doesNotMatch(html, /No pudimos cargar tus eventos/)
+  assert.doesNotMatch(render(OrganizerEventList, { ...props, loading: true }), /Concert/)
+  assert.doesNotMatch(render(OrganizerEventList, { ...props, error: 'Offline' }), /Concert/)
+})
 
 test('registration UI has username, passwords and invitation without a role selector', () => {
   const html = render(PartnerRegister)

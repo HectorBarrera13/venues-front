@@ -23,7 +23,7 @@ The Venues domain is maintained by **Team SubAgentes** and the Events domain by 
 - **Interactive Map Picker**: Leaflet and OpenStreetMap integration for bidirectional geocoding (click-to-pin and debounced search via Nominatim).
 - **Registration & Editing**: Form validation for venue details with in-place modal editing.
 - **Role-Based Guards**: UI boundaries restricting venue mutations to the `venue_owner` role.
-- **Event Registration**: Organizers register events with name, artist, a future date/time, and a venue selected from the refreshed catalogue. Events listing, details, and update screens remain pending.
+- **Event Registration & Listing**: Organizers register events and browse their paginated event list. Detail and update screens remain pending.
 - **Resilient API Handling**: Typed client errors separating validation (400) and authorization (403) failures.
 
 ---
@@ -201,6 +201,23 @@ cp .env.example .env
 `VITE_API_BASE_URL` configures the existing Venue client. Events uses a separate
 client and `/events-api` development proxy that preserves `/api/v1/events`.
 Production hosting must configure that proxy or supply an Events origin with CORS.
+
+### Organizer event list (T-147)
+
+`/events` now requests `GET /api/v1/events` with the current organizer ID, page,
+and page size. It displays name, artist, scheduled times in the browser timezone,
+venue name, and status. Page sizes are 10, 25, and 50. Changing the page size starts
+at page one; a page that disappears after concurrent changes returns to the last
+available page. Loading, empty, and error states include registration/retry actions.
+
+Venue names load independently through the existing Venue client. A catalogue
+failure leaves the event list usable and offers a separate retry. Session changes
+reset the view and cancel previous requests. The frontend organizer filter is a
+management-view restriction, not backend authorization: the existing read API is public.
+
+Event cards link to `/events/{id}` for T-148, which is still pending. Live browser
+verification of T-147 requires running the frontend development server; automated
+coverage includes request contracts, pagination, response filtering, and rendered UI.
 
 ### Running Locally
 

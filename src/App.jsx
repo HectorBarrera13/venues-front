@@ -13,6 +13,7 @@ import { canAccessRoute, getRouteRole } from "./auth/access.js";
 import { getPartnerHome } from "./auth/mockAuth.js";
 import EventRegisterPage from "./components/EventRegisterPage.jsx";
 import PartnerRegister from "./components/PartnerRegister.jsx";
+import OrganizerEventsPage from "./components/OrganizerEventsPage.jsx";
 
 function App() {
   const { currentUser } = useCurrentUser();
@@ -60,13 +61,7 @@ function App() {
             </div>
           </section>
         ) : currentPath === "/events" ? (
-          <section className="state-panel" aria-labelledby="events-title">
-            <div className="state-panel-inner">
-              <h1 id="events-title">Mis eventos</h1>
-              <p>Bienvenido a tu espacio de eventos.</p>
-              <a className="primary-button" href="/events/register">Registrar evento</a>
-            </div>
-          </section>
+          <OrganizerEventsPage />
         ) : currentPath === "/events/register" ? (
           <EventRegisterPage />
         ) : isRegisterRoute ? (

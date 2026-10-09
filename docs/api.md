@@ -4,7 +4,7 @@ This document outlines the API Venue contracts consumed by `venues-front` and Ev
 
 ## Overview
 
-The shared frontend integrates with `venue-service` and `dsaster-event-management`, directly or through the platform gateway. Event registration is connected. `VITE_API_BASE_URL` configures Venue; `VITE_EVENTS_API_BASE_URL` configures the Events origin, with `/api/v1/events` appended by the client.
+The shared frontend integrates with `venue-service` and `dsaster-event-management`, directly or through the platform gateway. Event registration and organizer listing are connected. `VITE_API_BASE_URL` configures Venue; `VITE_EVENTS_API_BASE_URL` configures the Events origin, with `/api/v1/events` appended by the client.
 
 - OpenAPI Specification: Maintained in the `venue-service` repository and published as `openapi.yml` with backend releases.
 
@@ -133,6 +133,11 @@ Missing fields or malformed date/UUID values are rejected by Axum extraction; th
 - Response: `200` with `{ "items": [], "page": 1, "per_page": 10, "total_items": 0, "total_pages": 0 }` for an empty catalogue.
 
 Items contain `id`, `organizer_id`, `venue_id`, `name`, `event_type`, `status`, nullable `artist`, `schedules`, and nullable `min_price`. Filters combine and results are ordered by creation time descending. This endpoint does not support name search.
+
+`EventsApiClient.getEvents()` always supplies the current organizer filter for the
+management view and validates pagination and response ownership before display.
+It does not issue an unfiltered request when organizer identity is missing. The
+backend endpoint remains public; frontend filtering is not server authorization.
 
 ### 5. Event Details
 
