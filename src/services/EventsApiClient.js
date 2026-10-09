@@ -1,4 +1,4 @@
-import { getToken } from '../auth/token.js'
+import { getEventsToken } from '../auth/token.js'
 
 export class EventApiError extends Error {
   constructor(message, status) {
@@ -17,7 +17,7 @@ export class EventsApiClient {
     try {
       response = await fetch(`${this.baseUrl}/api/v1/events`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', Accept: 'application/json', Authorization: `Bearer ${getToken()}` },
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json', Authorization: `Bearer ${getEventsToken()}` },
         body: JSON.stringify({ name: data.name, artist: data.artist, date: data.date, venue_id: data.venue_id }),
         signal,
       })

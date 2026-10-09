@@ -37,6 +37,14 @@ unknown paths have dedicated states. View state is keyed to the current credenti
 and discarded on session changes. These checks control the interface; owning
 services continue authorizing every HTTP request.
 
+Credential selection is service-specific: `getVenueToken()` selects a supplied
+JWT from the active session, preserved Venue credential, or restored `VITE_DEV_TOKEN`
+source. `getEventsToken()` uses the active Events/mock session and never substitutes
+a configured Venue credential for an organizer mock. Owner login retains the
+original JWT subject when a supplied owner credential is available. Sign-out clears
+the credentials and persists suppression of automatic development fallback.
+The frontend neither signs JWTs nor calls Auth to obtain them in this stage.
+
 - Registration collects name, artist, date, and a venue from **all registered venues**, refreshed when the form opens. Do not use the owner-filtered “Mis recintos” list.
 - Submit to `POST /api/v1/events` and show the returned confirmation. Events requires UUID references, snake_case fields, and a future RFC 3339 timestamp. The form collects local date/time, displays the browser timezone, and converts to UTC.
 - Event reads return dates in `schedules` and only a `venue_id`; resolve venue name/location from the catalogue when needed.

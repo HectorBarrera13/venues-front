@@ -77,7 +77,10 @@ Registers a new physical venue under the authenticated partner.
 ```
 
 > [!NOTE]
-> The frontend does not submit `ownerId` or roles in the payload. It sends a bearer credential. Venue backend validation and acceptance of the current mock token have not been verified.
+> The frontend does not submit `ownerId` or roles in the payload. It sends the
+> supplied Venue JWT via `getVenueToken()` and never sends an Events mock token.
+> Without a supplied JWT it omits Authorization. Venue backend validation and
+> token acceptance have not been verified.
 
 #### Responses
 

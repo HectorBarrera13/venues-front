@@ -19,6 +19,11 @@ and Venue backend changes are outside this work.
 
 **T-098:** `/login` now provides fixed mock accounts and persistent sessions,
 role-based landing destinations, and sign-out. `/events` is currently a placeholder.
+**T-098 compatibility follow-up:** The original `VITE_DEV_TOKEN` JWT source is
+restored. Venue calls use a supplied JWT independently of the Events mock token;
+mock credentials are not sent to Venue. Owner demo login uses the configured
+owner JWT's identity when available. Sign-out suppresses the development fallback
+across reloads, and explicit login re-enables it. No JWT is generated in the browser.
 **T-094:** Protected Backstage paths require a session; `/login` and `/register` are public. Direct links and
 history navigation redirect without mounting protected views. Invalid/expired
 sessions return to login, and API rejection clears the credential before redirecting

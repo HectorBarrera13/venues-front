@@ -1,6 +1,8 @@
 import { useRef, useState } from 'react'
-import { signInMockPartner, getMockSession, getPartnerHome } from '../auth/mockAuth.js'
-import { persistToken } from '../auth/token.js'
+import { signInMockPartner, getPartnerHome } from '../auth/mockAuth.js'
+import { getConfiguredVenueToken, persistToken } from '../auth/token.js'
+import { selectOwnerLoginToken } from '../auth/venueCredential.js'
+import { getSession } from '../auth/session.js'
 import { replaceRoute } from '../navigation.js'
 
 export default function PartnerSignIn() {
@@ -17,9 +19,10 @@ export default function PartnerSignIn() {
     setPending(true)
     setError('')
     try {
-      const token = await signInMockPartner(username, password)
+      const mockToken = await signInMockPartner(username, password)
+      const token = selectOwnerLoginToken(mockToken, getConfiguredVenueToken())
       persistToken(token)
-      replaceRoute(getPartnerHome(getMockSession(token)))
+      replaceRoute(getPartnerHome(getSession()))
     } catch (signInError) {
       setError(signInError.message)
     } finally {

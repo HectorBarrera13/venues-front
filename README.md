@@ -39,9 +39,29 @@ and owners land on the existing Venue screen at `/`.
 
 The session survives reloads. **Cerrar sesión** clears it and returns to login.
 No Auth service requests are made. These frontend fixtures produce `mock:<uuid>`
-credentials matching the Events backend's development partners. Venue API calls
-are unchanged; acceptance of these credentials by Venue Service is not verified
-in this checkout. Existing persisted JWT sessions remain readable.
+credentials matching the Events backend's development partners. Venue calls use
+a supplied JWT instead; mock credentials are never sent to Venue. Existing
+persisted JWT sessions remain readable.
+
+### Venue credential compatibility (T-098 follow-up)
+
+The original `VITE_DEV_TOKEN` JWT fallback is restored. Session credentials still
+prefer an explicit in-memory token, then `ds-aster.access-token` in localStorage,
+then the development token. Venue calls preserve a supplied JWT independently of
+an organizer's Events mock session. Venue URLs and request bodies are unchanged.
+
+Set `VITE_DEV_TOKEN` in `.env` to the JWT supplied by the existing Venue/Auth
+workflow, then restart Vite. When logging in as the owner demo, a supplied
+`VENUE_OWNER` JWT is used as the active session so venue filtering uses its original
+`sub`, not the fixed demo UUID. If you were already logged in as the owner demo,
+sign out and log in again after configuring the token. Organizer demo login
+continues using the Events mock credential, including when a Venue JWT is configured.
+
+Signing out clears stored credentials and suppresses development-token fallback
+across reloads. An explicit login re-enables it. Without a supplied JWT, owner demo
+screens remain available but Venue calls omit Authorization; no JWT is fabricated.
+The frontend only decodes claims for selection and display. Venue is responsible
+for checking the supplied token; live backend acceptance remains unverified.
 
 ### Invitation registration (T-095)
 
@@ -97,7 +117,7 @@ Sign in as `organizer@example.com` and choose **Registrar evento**, or open
 `/events/register`. The form requests the existing Venue catalogue each time it
 opens, without applying the owner filter used by “Mis recintos”. The Venue service
 must expose the complete catalogue to the organizer; that backend behavior and
-acceptance of the current mock token are still unverified. Catalogue errors and
+acceptance of the supplied Venue JWT are still unverified. Catalogue errors and
 empty results disable submission instead of supplying fake venue records.
 
 Enter a future date/time in the displayed browser timezone. The frontend converts
@@ -156,6 +176,7 @@ cp .env.example .env
 |---|---|---|
 | `VITE_API_BASE_URL` | Base URL for the venue-service API or gateway | `/api` |
 | `VITE_EVENTS_API_BASE_URL` | Events service origin (without `/api/v1/events`) | `/events-api` |
+| `VITE_DEV_TOKEN` | Existing Venue/Auth JWT for the development credential workflow | Empty |
 
 `VITE_API_BASE_URL` configures the existing Venue client. Events uses a separate
 client and `/events-api` development proxy that preserves `/api/v1/events`.
