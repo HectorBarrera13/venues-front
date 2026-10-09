@@ -88,6 +88,19 @@ the form and attempt role spoofing for both invitation types; subsequent login
 must still have the invitation's role. These are frontend/mock contract checks,
 not a substitute for authorization by the real Auth service.
 
+T-097 adds live password and confirmation feedback after typing or leaving a field.
+The minimum is eight characters; there are no additional case, number, or symbol
+rules. Changing the original password rechecks confirmation immediately. Passwords
+are not trimmed or case-normalized. Invalid values block registration, and submitting
+an invalid form focuses the first field with an error. The form and mock adapter
+share the same length policy.
+
+To check manually at `/register`, enter seven characters and verify the inline
+minimum error, then add an eighth. Enter a different confirmation, correct it,
+and change the original password again: confirmation should become invalid again.
+Use a length-only password such as `abcdefgh` to verify that no extra character
+requirements are imposed. Empty fields should not show errors before interaction.
+
 ### Unauthenticated redirects (T-094)
 
 Without a valid session, opening any protected Backstage path redirects to `/login` before

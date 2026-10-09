@@ -46,7 +46,12 @@ minimum is eight characters, with no documented character-class requirement.
 boundaries. Explicit and inherited role/identity fields are excluded from the
 payload. Direct mock calls ignore spoofed roles in both directions, and subsequent
 login retains the invitation role. No real Auth backend enforcement is claimed;
-production authorization remains with Ninjava. Ticket #97 remains for password feedback.
+production authorization remains with Ninjava.
+**T-097:** Registration now provides live password/confirmation feedback after
+interaction, rechecks confirmation when either value changes, and focuses the
+first invalid field on submission. The form and mock adapter share the documented
+eight-character minimum. Password values are preserved exactly; no character-class
+requirements are added. Invalid registrations do not consume demo invitations.
 
 **T-091:** Organizer event registration now lives at `/events/register`, with
 refreshed Venue catalogue loading, required-field/calendar/future-time/UUID

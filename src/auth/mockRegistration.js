@@ -1,5 +1,6 @@
 import { MOCK_ACCOUNTS } from './mockAuth.js'
 import { PartnerRegistrationError } from './partnerRegistration.js'
+import { getPasswordError } from './passwordPolicy.js'
 import { getRegisteredPartners, isInvitationUsed, passwordDigest, saveRegisteredPartner } from './mockPartnerStore.js'
 
 // Frontend-only invitations map onto the two partners known to Events.
@@ -10,7 +11,9 @@ export const DEMO_INVITATIONS = Object.freeze([
 
 export async function registerMockPartner({ username, password, invitationCode }) {
   const normalizedUsername = username.trim().toLowerCase()
-  if (!normalizedUsername || password.length < 8) throw new PartnerRegistrationError('Usuario o contraseña no válidos.')
+  if (!normalizedUsername) throw new PartnerRegistrationError('El usuario es obligatorio.', 400, { username: 'El usuario es obligatorio.' })
+  const passwordError = getPasswordError(password)
+  if (passwordError) throw new PartnerRegistrationError(passwordError, 400, { password: passwordError })
   const usernameExists = () => MOCK_ACCOUNTS.some((item) => item.email === normalizedUsername)
     || getRegisteredPartners().some((item) => item.username === normalizedUsername)
   if (usernameExists()) throw new PartnerRegistrationError('Este usuario ya está registrado.', 409, { username: 'Elige otro usuario.' })

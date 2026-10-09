@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { createPartnerRegistrationPayload } from '../auth/partnerRegistration.js'
 import { registerMockPartner } from '../auth/mockRegistration.js'
 import { replaceRoute } from '../navigation.js'
+import { getPasswordError, PASSWORD_MIN_LENGTH, validatePartnerPasswords } from '../auth/passwordPolicy.js'
 
 export default function PartnerRegister() {
   const [form, setForm] = useState({ username: '', password: '', confirmPassword: '', invitationCode: '' })
@@ -9,18 +10,31 @@ export default function PartnerRegister() {
   const [error, setError] = useState('')
   const [pending, setPending] = useState(false)
   const [registered, setRegistered] = useState(null)
+  const [touched, setTouched] = useState({})
   const busy = useRef(false)
   const active = useRef(true)
   useEffect(() => { active.current = true; return () => { active.current = false } }, [])
+  const passwordErrors = validatePartnerPasswords(form.password, form.confirmPassword)
+  const fieldError = (field) => ['password', 'confirmPassword'].includes(field) && touched[field]
+    ? passwordErrors[field] : errors[field]
+
+  function changeField(field, value) {
+    setForm((previous) => ({ ...previous, [field]: value }))
+    setTouched((previous) => ({ ...previous, [field]: true }))
+    setErrors((previous) => ({ ...previous, [field]: '' }))
+    setError('')
+  }
 
   const goToLogin = (event) => { event.preventDefault(); replaceRoute('/login') }
   async function submit(event) {
     event.preventDefault()
+    const formElement = event.currentTarget
     if (busy.current) return
     busy.current = true
     setPending(true)
     setError('')
     setErrors({})
+    setTouched({ password: true, confirmPassword: true })
     try {
       const payload = createPartnerRegistrationPayload(form)
       const result = await registerMockPartner(payload)
@@ -29,7 +43,12 @@ export default function PartnerRegister() {
         setForm({ username: '', password: '', confirmPassword: '', invitationCode: '' })
       }
     } catch (failure) {
-      if (active.current) { setError(failure.message); setErrors(failure.fields || {}) }
+      if (active.current) {
+        setError(failure.message)
+        setErrors(failure.fields || {})
+        const firstField = ['username', 'password', 'confirmPassword', 'invitationCode'].find((field) => failure.fields?.[field])
+        if (firstField) formElement.elements.namedItem(firstField)?.focus()
+      }
     } finally {
       busy.current = false
       if (active.current) setPending(false)
@@ -57,10 +76,16 @@ export default function PartnerRegister() {
                   <input id={`register-${field}`} name={field} required disabled={pending} value={form[field]}
                     type={field.includes('assword') ? 'password' : 'text'}
                     autoComplete={field === 'username' ? 'username' : field.includes('assword') ? 'new-password' : 'off'}
-                    aria-invalid={Boolean(errors[field])} aria-describedby={errors[field] ? `error-${field}` : field === 'password' ? 'password-minimum' : undefined}
-                    onChange={(event) => { setForm((previous) => ({ ...previous, [field]: event.target.value })); setErrors((previous) => ({ ...previous, [field]: '' })) }} />
-                  {field === 'password' && <p id="password-minimum">Al menos 8 caracteres.</p>}
-                  {errors[field] && <p id={`error-${field}`} className="form-error" role="alert">{errors[field]}</p>}
+                    minLength={field === 'password' ? PASSWORD_MIN_LENGTH : undefined}
+                    aria-invalid={Boolean(fieldError(field))}
+                    aria-describedby={[field === 'password' && 'password-minimum', field === 'confirmPassword' && touched.confirmPassword && !passwordErrors.confirmPassword && 'password-match', fieldError(field) && `error-${field}`].filter(Boolean).join(' ') || undefined}
+                    onBlur={() => setTouched((previous) => ({ ...previous, [field]: true }))}
+                    onChange={(event) => changeField(field, event.target.value)} />
+                  {field === 'password' && <p id="password-minimum" aria-live="polite">
+                    {touched.password && !getPasswordError(form.password) ? 'Mínimo cumplido: ' : ''}Al menos {PASSWORD_MIN_LENGTH} caracteres.
+                  </p>}
+                  {field === 'confirmPassword' && touched.confirmPassword && !passwordErrors.confirmPassword && <p id="password-match" aria-live="polite">Las contraseñas coinciden.</p>}
+                  {fieldError(field) && <p id={`error-${field}`} className="form-error" aria-live="polite">{fieldError(field)}</p>}
                 </div>
               ))}
               {error && <p className="sign-in-error" role="alert">{error}</p>}
