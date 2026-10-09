@@ -81,6 +81,13 @@ fixture identities; credentials and invitation-use state reset on page reload.
 No Auth API is called and new passwords are not persisted. See
 [the Ninjava contract reference](context/product/mvp-03-partner-access.md).
 
+T-096 verifies that registration exposes only username, passwords, and invitation
+code, with no hidden or selectable role field. The request allowlist excludes role
+and identity metadata, including inherited properties. Mock adapter tests bypass
+the form and attempt role spoofing for both invitation types; subsequent login
+must still have the invitation's role. These are frontend/mock contract checks,
+not a substitute for authorization by the real Auth service.
+
 ### Unauthenticated redirects (T-094)
 
 Without a valid session, opening any protected Backstage path redirects to `/login` before

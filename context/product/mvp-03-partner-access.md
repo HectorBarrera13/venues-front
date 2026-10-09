@@ -29,6 +29,7 @@ kept only as salted demo digests in memory, never in browser storage. This is no
 the production bcrypt/identity implementation. Reloading resets demo registration
 and used invitations; the original fixture logins remain available.
 
-T-096 and T-097 are separate tickets for formal role-free registration enforcement
-and client-side password feedback. T-095 already follows the basic documented
-payload and eight-character minimum.
+T-096 verifies the role-free UI and allowlisted payload, and checks that spoofed
+roles cannot override either invitation type in the mock or change the role after
+login. T-097 remains for client-side password feedback. T-095 already follows the
+basic documented payload and eight-character minimum.

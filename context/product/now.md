@@ -42,8 +42,11 @@ with a role-free request and frontend mock registration. Login accepts usernames
 Demo registrations map to existing backend fixture identities and last only until
 page reload; production Auth communication is deferred. The current Ninjava
 minimum is eight characters, with no documented character-class requirement.
-Tickets #96 and #97 remain separately tracked for role-free interface enforcement
-and password feedback.
+**T-096:** Role-free registration is verified at the UI, payload, and mock adapter
+boundaries. Explicit and inherited role/identity fields are excluded from the
+payload. Direct mock calls ignore spoofed roles in both directions, and subsequent
+login retains the invitation role. No real Auth backend enforcement is claimed;
+production authorization remains with Ninjava. Ticket #97 remains for password feedback.
 
 **T-091:** Organizer event registration now lives at `/events/register`, with
 refreshed Venue catalogue loading, required-field/calendar/future-time/UUID
