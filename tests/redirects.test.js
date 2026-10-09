@@ -61,21 +61,25 @@ test('server-rejected sessions are cleared and history is replaced only once', (
   assert.equal(notifications, 1)
 })
 
-test('an active JWT session notifies subscribers at expiration', { timeout: 1000 }, async () => {
+test('an active JWT session notifies subscribers at expiration', (context) => {
+  context.mock.timers.enable({ apis: ['setTimeout', 'Date'], now: 1000 })
   const claims = { sub: 'owner', role: 'VENUE_OWNER', exp: (Date.now() + 40) / 1000 }
   setToken(`header.${btoa(JSON.stringify(claims))}.signature`)
   const before = getSessionSnapshot()
   assert.ok(before)
   assert.equal(getSessionSnapshot(), before)
-  let unsubscribe
+  let notifications = 0
+  const unsubscribe = subscribeToSession(() => { notifications += 1 })
   try {
-    await new Promise((resolve) => {
-      unsubscribe = subscribeToSession(resolve)
-    })
+    context.mock.timers.tick(39)
+    assert.equal(notifications, 0)
+    assert.equal(getSessionSnapshot(), before)
+    context.mock.timers.tick(1)
+    assert.equal(notifications, 1)
     assert.equal(getSessionSnapshot(), null)
     assert.equal(getSessionRedirect('/venues/register', getSessionSnapshot()), '/login')
   } finally {
-    unsubscribe?.()
+    unsubscribe()
     persistToken(null)
   }
 })
