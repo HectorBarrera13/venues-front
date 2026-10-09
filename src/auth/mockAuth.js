@@ -1,4 +1,5 @@
 import { ROLES } from './constants.js'
+import { getRegisteredPartners, passwordDigest } from './mockPartnerStore.js'
 
 // Frontend fixtures only. Events independently resolves the ID and role.
 export const MOCK_ACCOUNTS = Object.freeze([
@@ -23,8 +24,18 @@ export function authenticateMockPartner(email, password) {
   const account = MOCK_ACCOUNTS.find(
     (candidate) => candidate.email === normalizedEmail && candidate.password === password,
   )
-  if (!account) throw new Error('El correo o la contraseña no son correctos.')
+  if (!account) throw new Error('El usuario o la contraseña no son correctos.')
   return `mock:${account.userId}`
+}
+
+export async function signInMockPartner(username, password) {
+  const normalizedUsername = username.trim().toLowerCase()
+  const registered = getRegisteredPartners().find((account) => account.username === normalizedUsername)
+  if (!registered) return authenticateMockPartner(username, password)
+  if (await passwordDigest(password, registered.salt) !== registered.digest) {
+    throw new Error('El usuario o la contraseña no son correctos.')
+  }
+  return `mock:${registered.userId}`
 }
 
 export function getMockSession(token) {

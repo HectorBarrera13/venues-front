@@ -1,22 +1,30 @@
-import { useState } from 'react'
-import { authenticateMockPartner, getMockSession, getPartnerHome } from '../auth/mockAuth.js'
+import { useRef, useState } from 'react'
+import { signInMockPartner, getMockSession, getPartnerHome } from '../auth/mockAuth.js'
 import { persistToken } from '../auth/token.js'
 import { replaceRoute } from '../navigation.js'
 
 export default function PartnerSignIn() {
-  const [email, setEmail] = useState('')
+  const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
+  const [pending, setPending] = useState(false)
+  const busy = useRef(false)
 
-  function handleSubmit(event) {
+  async function handleSubmit(event) {
     event.preventDefault()
+    if (busy.current) return
+    busy.current = true
+    setPending(true)
     setError('')
     try {
-      const token = authenticateMockPartner(email, password)
+      const token = await signInMockPartner(username, password)
       persistToken(token)
       replaceRoute(getPartnerHome(getMockSession(token)))
     } catch (signInError) {
       setError(signInError.message)
+    } finally {
+      busy.current = false
+      setPending(false)
     }
   }
 
@@ -29,18 +37,19 @@ export default function PartnerSignIn() {
         <p>Accede a tu espacio para administrar recintos o eventos.</p>
         <form onSubmit={handleSubmit} className="sign-in-form">
           <div className="form-field">
-            <label htmlFor="sign-in-email">Correo electrónico</label>
-            <input id="sign-in-email" name="email" type="email" autoComplete="username"
-              required value={email} onChange={(event) => { setEmail(event.target.value); setError('') }} />
+            <label htmlFor="sign-in-username">Usuario</label>
+            <input id="sign-in-username" name="username" type="text" autoComplete="username"
+              required value={username} disabled={pending} onChange={(event) => { setUsername(event.target.value); setError('') }} />
           </div>
           <div className="form-field">
             <label htmlFor="sign-in-password">Contraseña</label>
             <input id="sign-in-password" name="password" type="password" autoComplete="current-password"
-              required value={password} onChange={(event) => { setPassword(event.target.value); setError('') }} />
+              required value={password} disabled={pending} onChange={(event) => { setPassword(event.target.value); setError('') }} />
           </div>
           {error && <p className="sign-in-error" role="alert">{error}</p>}
-          <button className="primary-button" type="submit">Iniciar sesión</button>
+          <button className="primary-button" type="submit" disabled={pending}>{pending ? 'Iniciando sesión…' : 'Iniciar sesión'}</button>
         </form>
+        <a className="back-link" href="/register" onClick={(event) => { event.preventDefault(); replaceRoute('/register') }}>Registrarme con invitación</a>
         <aside className="demo-accounts" aria-label="Cuentas de demostración">
           <strong>Acceso de demostración</strong>
           <p>Organizador: <code>organizer@example.com</code></p>

@@ -39,7 +39,20 @@ global.window = { localStorage: { setItem() {}, removeItem() {}, getItem() { ret
 const Header = await loadComponent('Header')
 const VenueCard = await loadComponent('VenueCard')
 const EventRegisterForm = await loadComponent('EventRegisterForm')
+const PartnerRegister = await loadComponent('PartnerRegister')
+const PartnerSignIn = await loadComponent('PartnerSignIn')
 const render = (Component, props) => renderToStaticMarkup(createElement(Component, props))
+
+test('registration UI has username, passwords and invitation without a role selector', () => {
+  const html = render(PartnerRegister)
+  for (const field of ['username', 'password', 'confirmPassword', 'invitationCode']) assert.match(html, new RegExp(`name="${field}"`))
+  assert.doesNotMatch(html, /name="role"|name="email"|<select/)
+  assert.match(html, /autoComplete="new-password"/)
+  const login = render(PartnerSignIn)
+  assert.match(login, /name="username"/)
+  assert.doesNotMatch(login, /type="email"/)
+  assert.match(login, /href="\/register"/)
+})
 
 test('header follows the active role and hides owner actions from organizers', () => {
   persistToken(authenticateMockPartner('organizer@example.com', 'Backstage123!'))

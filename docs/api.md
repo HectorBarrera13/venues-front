@@ -15,6 +15,17 @@ The shared frontend integrates with `venue-service` and `dsaster-event-managemen
 
 ## Endpoints
 
+### Partner access (frontend mock; future Ninjava integration)
+
+The user-supplied Ninjava document specifies `POST /auth/register` with
+`{ username, password, invitationCode }`, returning `{ id, username, role }` on
+`201`. Role derives from the invitation; duplicate usernames return `409`, and
+invalid/used invitation codes return `400`. Passwords require at least eight
+characters. `POST /auth/login` takes `{ username, password }` and returns
+`{ accessToken, tokenType, expiresIn }`. These endpoints are documented here for
+alignment; the frontend currently uses its mock adapter rather than calling them.
+See [the contract reference](../context/product/mvp-03-partner-access.md).
+
 ### 1. List Venues
 
 Retrieves all physical venues registered in the system.

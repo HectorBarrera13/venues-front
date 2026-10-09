@@ -6,6 +6,7 @@ The supplied product requirements are preserved here:
 
 - [MVP 01 — Venue and Event Registration](mvp-01-venue-and-event-registration.md)
 - [MVP 02 — Event Search and Purchase](mvp-02-event-search-and-purchase.md)
+- [MVP 03 — Partner Access contract reference](mvp-03-partner-access.md)
 
 Both source documents are marked Draft, version 1.0. Their contents are product requirements; implementation status is recorded below. They narrow the broader long-term scope in `context/CONTEXT.md` and `context/architechture/arch.md`.
 
@@ -18,7 +19,7 @@ and Venue backend changes are outside this work.
 
 **T-098:** `/login` now provides fixed mock accounts and persistent sessions,
 role-based landing destinations, and sign-out. `/events` is currently a placeholder.
-**T-094:** All Backstage paths require a session except `/login`. Direct links and
+**T-094:** Protected Backstage paths require a session; `/login` and `/register` are public. Direct links and
 history navigation redirect without mounting protected views. Invalid/expired
 sessions return to login, and API rejection clears the credential before redirecting
 to avoid a login loop. Active JWT expiry notifies the UI automatically; mock
@@ -31,8 +32,13 @@ edit/delete actions. Event create/update permissions are defined for the upcomin
 integration; no Event delete permission exists. Views reset when identity changes,
 and responses from the previous session are discarded. Backend authorization
 remains the owning service's responsibility.
-Partner registration (#95/#96) and password-policy validation
-(#97) are separate from the mock sign-in form.
+**T-095:** `/register` now has username, password/confirmation and invitation code,
+with a role-free request and frontend mock registration. Login accepts usernames.
+Demo registrations map to existing backend fixture identities and last only until
+page reload; production Auth communication is deferred. The current Ninjava
+minimum is eight characters, with no documented character-class requirement.
+Tickets #96 and #97 remain separately tracked for role-free interface enforcement
+and password feedback.
 
 **T-091:** Organizer event registration now lives at `/events/register`, with
 refreshed Venue catalogue loading, required-field/calendar/future-time/UUID

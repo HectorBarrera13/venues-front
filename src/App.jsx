@@ -12,6 +12,7 @@ import { getSessionRedirect } from "./auth/redirects.js";
 import { canAccessRoute, getRouteRole } from "./auth/access.js";
 import { getPartnerHome } from "./auth/mockAuth.js";
 import EventRegisterPage from "./components/EventRegisterPage.jsx";
+import PartnerRegister from "./components/PartnerRegister.jsx";
 
 function App() {
   const { currentUser } = useCurrentUser();
@@ -35,6 +36,7 @@ function App() {
 
   // Do not mount protected views or start their API calls during a redirect.
   if (redirectTo) return null;
+  if (!currentUser && currentPath === "/register") return <PartnerRegister />;
   if (!currentUser) return <PartnerSignIn />;
   if (isSignInRoute) return null;
 

@@ -43,14 +43,32 @@ credentials matching the Events backend's development partners. Venue API calls
 are unchanged; acceptance of these credentials by Venue Service is not verified
 in this checkout. Existing persisted JWT sessions remain readable.
 
+### Invitation registration (T-095)
+
+Choose **Registrarme con invitación** on login, or open `/register`. Enter a
+username, password (at least eight characters), confirmation, and invitation code.
+There is no role selector: the invitation determines the role. The current
+Ninjava contract uses usernames, not email addresses; the original email-shaped
+demo usernames still work on login.
+
+Demo invitations: `K7PX-3MZQ-9HTA` for an organizer, `V7PX-3MZQ-9HTA` for an owner.
+After registration, use the form's **Iniciar sesión** link and sign in with the new
+credentials. Each invitation can be used once per page lifetime. Duplicate usernames
+and invalid/used codes show errors without consuming valid codes on failure.
+
+This remains frontend-only authentication. Accounts reuse the existing backend
+fixture identities; credentials and invitation-use state reset on page reload.
+No Auth API is called and new passwords are not persisted. See
+[the Ninjava contract reference](context/product/mvp-03-partner-access.md).
+
 ### Unauthenticated redirects (T-094)
 
-Without a valid session, opening any Backstage path redirects to `/login` before
+Without a valid session, opening any protected Backstage path redirects to `/login` before
 protected views mount or issue requests. Malformed credentials, unknown mock IDs,
 and expired JWTs are treated as signed out. Active JWT expiry updates the UI;
 mock sessions have no expiration. An API `401` clears the rejected credential
 before returning to login. Redirects replace browser history and avoid repeating
-the same navigation.
+the same navigation. `/login` and invitation registration at `/register` are public.
 
 To check manually, sign out and open `/events`, `/venues/register`, and `/` directly.
 Each should show login at `/login`. Sign in, sign out, and press Back: protected
