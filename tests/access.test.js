@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { canAccessRoute, canManageVenue, canPerformAction, getRouteRole } from '../src/auth/access.js'
+import { canAccessRoute, canManageEvent, canManageVenue, canPerformAction, getRouteRole } from '../src/auth/access.js'
 import { authenticateMockPartner, getMockSession } from '../src/auth/mockAuth.js'
 
 const organizer = getMockSession(authenticateMockPartner('organizer@example.com', 'Backstage123!'))
@@ -50,4 +50,13 @@ test('venue mutation permissions require the current owning partner', () => {
   assert.equal(canManageVenue({ ...owner, userId: 'another-owner' }, venue), false)
   assert.equal(canManageVenue(null, venue), false)
   assert.equal(canManageVenue(owner, {}), false)
+})
+
+test('event mutation permissions require the current owning organizer', () => {
+  const event = { organizer_id: organizer.userId }
+  assert.equal(canManageEvent(organizer, event), true)
+  assert.equal(canManageEvent(owner, event), false)
+  assert.equal(canManageEvent({ ...organizer, userId: 'another-organizer' }, event), false)
+  assert.equal(canManageEvent(null, event), false)
+  assert.equal(canManageEvent(organizer, {}), false)
 })
