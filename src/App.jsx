@@ -15,6 +15,7 @@ import EventRegisterPage from "./components/EventRegisterPage.jsx";
 import PartnerRegister from "./components/PartnerRegister.jsx";
 import OrganizerEventsPage from "./components/OrganizerEventsPage.jsx";
 import EventDetailPage from "./domains/events/detail/EventDetailPage.jsx";
+import EventEditPage from "./domains/events/edit/EventEditPage.jsx";
 
 function App() {
   const { currentUser } = useCurrentUser();
@@ -26,6 +27,8 @@ function App() {
     return () => window.removeEventListener("popstate", handleLocationChange);
   }, []);
 
+  const eventEditMatch = currentPath.match(/^\/events\/([^/]+)\/edit$/);
+  const eventEditId = eventEditMatch ? decodeURIComponent(eventEditMatch[1]) : null;
   const eventDetailMatch = currentPath.match(/^\/events\/([^/]+)$/);
   const eventDetailId = eventDetailMatch && eventDetailMatch[1] !== "register"
     ? decodeURIComponent(eventDetailMatch[1])
@@ -34,7 +37,7 @@ function App() {
   const isSignInRoute = currentPath === SIGN_IN_PATH;
   const redirectTo = getSessionRedirect(currentPath, currentUser);
   const hasAccess = canAccessRoute(currentUser, currentPath);
-  const isKnownView = Boolean(eventDetailId) || ["/", "/venues", "/venues/register", "/events", "/events/register"].includes(currentPath);
+  const isKnownView = Boolean(eventEditId) || Boolean(eventDetailId) || ["/", "/venues", "/venues/register", "/events", "/events/register"].includes(currentPath);
 
   useEffect(() => {
     if (redirectTo) replaceRoute(redirectTo);
@@ -65,6 +68,8 @@ function App() {
               <a className="primary-button" href={getPartnerHome(currentUser)}>Volver a mi panel</a>
             </div>
           </section>
+        ) : eventEditId ? (
+          <EventEditPage eventId={eventEditId} />
         ) : eventDetailId ? (
           <EventDetailPage eventId={eventDetailId} />
         ) : currentPath === "/events" ? (
