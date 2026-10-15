@@ -14,6 +14,7 @@ import { getPartnerHome } from "./auth/mockAuth.js";
 import EventRegisterPage from "./components/EventRegisterPage.jsx";
 import PartnerRegister from "./components/PartnerRegister.jsx";
 import OrganizerEventsPage from "./components/OrganizerEventsPage.jsx";
+import EventDetailPage from "./domains/events/detail/EventDetailPage.jsx";
 
 function App() {
   const { currentUser } = useCurrentUser();
@@ -25,11 +26,15 @@ function App() {
     return () => window.removeEventListener("popstate", handleLocationChange);
   }, []);
 
+  const eventDetailMatch = currentPath.match(/^\/events\/([^/]+)$/);
+  const eventDetailId = eventDetailMatch && eventDetailMatch[1] !== "register"
+    ? decodeURIComponent(eventDetailMatch[1])
+    : null;
   const isRegisterRoute = currentPath === "/venues/register" || currentPath === "/events/register";
   const isSignInRoute = currentPath === SIGN_IN_PATH;
   const redirectTo = getSessionRedirect(currentPath, currentUser);
   const hasAccess = canAccessRoute(currentUser, currentPath);
-  const isKnownView = ["/", "/venues", "/venues/register", "/events", "/events/register"].includes(currentPath);
+  const isKnownView = Boolean(eventDetailId) || ["/", "/venues", "/venues/register", "/events", "/events/register"].includes(currentPath);
 
   useEffect(() => {
     if (redirectTo) replaceRoute(redirectTo);
@@ -60,6 +65,8 @@ function App() {
               <a className="primary-button" href={getPartnerHome(currentUser)}>Volver a mi panel</a>
             </div>
           </section>
+        ) : eventDetailId ? (
+          <EventDetailPage eventId={eventDetailId} />
         ) : currentPath === "/events" ? (
           <OrganizerEventsPage />
         ) : currentPath === "/events/register" ? (

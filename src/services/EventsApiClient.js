@@ -74,6 +74,38 @@ export class EventsApiClient {
     }
     return payload
   }
+
+  async getEvent(id, { signal } = {}) {
+    if (typeof id !== 'string' || !id.trim()) {
+      throw new EventApiError('Identificador de evento inválido.', 400)
+    }
+    const token = getEventsToken()
+    let response
+    try {
+      response = await fetch(`${this.baseUrl}/api/v1/events/${encodeURIComponent(id.trim())}`, {
+        headers: {
+          Accept: 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        signal,
+      })
+    } catch (error) {
+      if (error.name === 'AbortError') throw error
+      throw new Error('No fue posible conectar con Events.', { cause: error })
+    }
+    const payload = await response.json().catch(() => null)
+    if (!response.ok) {
+      const fallback = {
+        400: 'Identificador de evento inválido.',
+        404: 'Evento no encontrado.',
+      }[response.status] || 'No pudimos cargar el evento.'
+      throw new EventApiError(typeof payload?.error === 'string' ? payload.error : fallback, response.status)
+    }
+    if (!payload?.id || !payload?.organizer_id || !payload?.venue_id || !payload?.name || !Array.isArray(payload?.schedules)) {
+      throw new Error('Events devolvió un detalle inesperado.')
+    }
+    return payload
+  }
 }
 
 export default new EventsApiClient()

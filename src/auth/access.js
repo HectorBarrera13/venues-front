@@ -28,3 +28,8 @@ export function canManageVenue(session, venue) {
   return canPerformAction(session, 'venues.update') && Boolean(session.userId)
     && session.userId === venue?.ownerId
 }
+
+export function canManageEvent(session, event) {
+  return canPerformAction(session, 'events.update') && Boolean(session?.userId)
+    && session.userId === event?.organizer_id
+}

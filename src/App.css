@@ -79,6 +79,120 @@
   margin-top: 28px;
 }
 .event-pagination select { padding: 8px; border: 1px solid #cbd8e8; border-radius: 6px; font: inherit; }
+
+.event-detail-container {
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+  max-width: 980px;
+  margin: 0 auto;
+}
+
+.event-detail-nav {
+  display: flex;
+  align-items: center;
+}
+
+.event-detail-header {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.event-detail-badges {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.event-type-badge {
+  padding: 5px 10px;
+  border-radius: 6px;
+  color: #553c9a;
+  background: #f3ebfc;
+  font-size: 0.8rem;
+  font-weight: 750;
+}
+
+.event-detail-artist {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #45516b;
+}
+
+.event-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 20px;
+}
+
+.event-detail-card {
+  padding: 24px;
+  border: 1px solid #dce5f1;
+  border-radius: 12px;
+  background: #ffffff;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.event-detail-card h2 {
+  margin: 0;
+  font-size: 1.1rem;
+  color: #172b4d;
+}
+
+.event-detail-card--full {
+  grid-column: 1 / -1;
+}
+
+.event-schedules-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.event-schedule-time {
+  margin: 0;
+  font-size: 1rem;
+  color: #243350;
+}
+
+.event-venue-info {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.event-venue-name {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #172b4d;
+}
+
+.event-description {
+  margin: 0;
+  line-height: 1.6;
+  color: #3e4d68;
+}
+
+.event-policy {
+  margin: 0;
+  color: #3e4d68;
+}
+
+.event-detail-footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 16px;
+  margin-top: 12px;
+  padding-top: 24px;
+  border-top: 1px solid #e2e8f0;
+}
+
 .sr-only {
   position: absolute;
   width: 1px;
@@ -660,6 +774,18 @@
 }
 .state-panel .primary-button {
   margin-top: 22px;
+}
+.state-panel-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 22px;
+}
+.state-panel-actions .primary-button,
+.state-panel-actions .secondary-button {
+  margin-top: 0;
 }
 .state-panel--error {
   border-color: #f0bec6;
