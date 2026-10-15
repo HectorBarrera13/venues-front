@@ -11,7 +11,7 @@ The `venues-front` application is the partner-facing client for the **Venues and
 - Enables Venue Owners to register physical spaces, maintain metadata, edit venue profiles, and select geographical coordinates on an interactive map.
 - Consumes the venue catalogue and registration endpoints exposed by `venue-service` (Team SubAgentes).
 
-- Will consume registration, listing, and detail endpoints from `dsaster-event-management` (Team Aura); Events frontend integration is pending.
+- Consumes event registration and organizer listing from `dsaster-event-management` (Team Aura); detail and updating integration remains pending.
 - Uses mocked authentication for the current MVP. See [active requirements](../context/product/now.md).
 
 ### Layer Responsibilities
@@ -27,12 +27,32 @@ The `venues-front` application is the partner-facing client for the **Venues and
 
 ## 2. Events Integration
 
-Reuse the shared header and mock identity store, and add an Events API client under `src/services/` with event workflow hooks under `src/hooks/`.
+Event registration uses `EventsApiClient` under `src/services/` and
+`useEventRegistration` under `src/hooks/`, with a presentational form and page wrapper.
+
+Backstage uses `src/auth/access.js` for route and action permissions. Organizer
+sessions can enter the Events namespace, and venue-owner sessions can enter the
+Venue namespace. The root route checks access before mounting a view; denied and
+unknown paths have dedicated states. View state is keyed to the current credential
+and discarded on session changes. These checks control the interface; owning
+services continue authorizing every HTTP request.
+
+Credential selection is service-specific: `getVenueToken()` selects a supplied
+JWT from the active session, preserved Venue credential, or restored `VITE_DEV_TOKEN`
+source. `getEventsToken()` uses the active Events/mock session and never substitutes
+a configured Venue credential for an organizer mock. Owner login retains the
+original JWT subject when a supplied owner credential is available. Sign-out clears
+the credentials and persists suppression of automatic development fallback.
+The frontend neither signs JWTs nor calls Auth to obtain them in this stage.
 
 - Registration collects name, artist, date, and a venue from **all registered venues**, refreshed when the form opens. Do not use the owner-filtered “Mis recintos” list.
-- Submit to `POST /api/v1/events` and show the returned confirmation. Events requires UUID references, snake_case fields, and a future RFC 3339 timestamp; agree date/timezone conversion for the calendar-date input.
+- Submit to `POST /api/v1/events` and show the returned confirmation. Events requires UUID references, snake_case fields, and a future RFC 3339 timestamp. The form collects local date/time, displays the browser timezone, and converts to UTC.
 - Event reads return dates in `schedules` and only a `venue_id`; resolve venue name/location from the catalogue when needed.
-- The current Events backend uses a fixed organizer ID if omitted. Keep identity out of form inputs and align the backend mock provider with the shared mock identity.
+- Organizer listing uses `useOrganizerEvents` and a presentational `OrganizerEventList`. Events and Venue catalogue requests run independently with cancellation and session/request keys. Unavailable venue metadata does not prevent listing events. Page-size changes reset pagination, and no previous-session rows are shown during loading.
+- The Events backend derives organizer identity from its mock bearer credential. Identity is absent from registration form inputs and request bodies.
 - Configure separate service URLs or gateway routes. Real venue validation requires disabling the Events permissive venue mock and verifying its Venue API path.
 
-Seat maps, pricing, on-sale scheduling, editing/deletion, media, and analytics are outside the registration MVP. Public name search and ticket issuance belong to Search and Booking; their contracts have not been inspected here.
+Seat maps, pricing, on-sale scheduling, deletion, media, and analytics are outside
+this implementation. Event updating is in the agreed CRU scope and remains pending.
+Public name search and ticket issuance belong to Search and Booking; their contracts
+have not been inspected here.

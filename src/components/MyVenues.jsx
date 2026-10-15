@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import useCurrentUser from '../hooks/useCurrentUser.js'
-import { goToSignIn } from '../auth/session.js'
+import { getSession, goToSignIn } from '../auth/session.js'
+import { canManageVenue } from '../auth/access.js'
 import venueApiClient from '../services/VenueApiClient.js'
 import VenueCard from './VenueCard.jsx'
 import VenueEditModal from './VenueEditModal.jsx'
@@ -37,9 +38,11 @@ function MyVenues() {
       setLoading(true)
       setError('')
       try {
-        setVenues(await venueApiClient.getVenues({ signal: controller.signal }))
+        const result = await venueApiClient.getVenues({ signal: controller.signal })
+        if (controller.signal.aborted) return
+        setVenues(result)
       } catch (requestError) {
-        if (requestError.name === 'AbortError') return
+        if (controller.signal.aborted || requestError.name === 'AbortError') return
         if (requestError.status === 401) goToSignIn()
         setError(getLoadErrorMessage(requestError))
       } finally {
@@ -56,6 +59,7 @@ function MyVenues() {
   }, [currentUser, venues])
 
   const handleDelete = useCallback((venueToDelete) => {
+    if (!canManageVenue(getSession(), venueToDelete)) return
     const confirmed = window.confirm(
       `¿Estás seguro de que deseas eliminar el recinto "${venueToDelete.name || 'este recinto'}"? Esta acción no se puede deshacer.`
     )
@@ -69,10 +73,12 @@ function MyVenues() {
   }, [])
 
   const handleEdit = useCallback((venueToEdit) => {
+    if (!canManageVenue(getSession(), venueToEdit)) return
     setEditingVenue(venueToEdit)
   }, [])
 
   const handleSaveEdit = useCallback((updatedVenue) => {
+    if (!canManageVenue(getSession(), updatedVenue)) return
     setVenues((prev) =>
       prev.map((v) => (v.id === updatedVenue.id ? { ...v, ...updatedVenue } : v))
     )

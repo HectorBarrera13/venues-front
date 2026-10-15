@@ -23,12 +23,133 @@ The Venues domain is maintained by **Team SubAgentes** and the Events domain by 
 - **Interactive Map Picker**: Leaflet and OpenStreetMap integration for bidirectional geocoding (click-to-pin and debounced search via Nominatim).
 - **Registration & Editing**: Form validation for venue details with in-place modal editing.
 - **Role-Based Guards**: UI boundaries restricting venue mutations to the `venue_owner` role.
-- **Events Integration (Pending)**: The Events backend supports registration, paginated listing, and detail retrieval. Frontend registration will collect name, artist, date, and a venue selected from the complete catalogue.
+- **Event Registration & Listing**: Organizers register events and browse their paginated event list. Detail and update screens remain pending.
 - **Resilient API Handling**: Typed client errors separating validation (400) and authorization (403) failures.
 
 ---
 
-The current MVP uses mocked authentication. See [context/product/now.md](context/product/now.md) for requirements and exclusions. Existing edit/delete actions affect local state only.
+The current MVP uses mocked authentication. See [context/product/now.md](context/product/now.md) for requirements and exclusions. Existing venue edit/delete actions affect local state only.
+
+### Mock partner sign-in (T-098)
+
+Open `/login`. Use `organizer@example.com` or `owner@example.com`, with password
+`Backstage123!` for either account. The account determines the role; there is no
+role selector. Organizers land on `/events` (a placeholder until Events integration)
+and owners land on the existing Venue screen at `/`.
+
+The session survives reloads. **Cerrar sesión** clears it and returns to login.
+No Auth service requests are made. These frontend fixtures produce `mock:<uuid>`
+credentials matching the Events backend's development partners. Venue calls use
+a supplied JWT instead; mock credentials are never sent to Venue. Existing
+persisted JWT sessions remain readable.
+
+### Venue credential compatibility (T-098 follow-up)
+
+The original `VITE_DEV_TOKEN` JWT fallback is restored. Session credentials still
+prefer an explicit in-memory token, then `ds-aster.access-token` in localStorage,
+then the development token. Venue calls preserve a supplied JWT independently of
+an organizer's Events mock session. Venue URLs and request bodies are unchanged.
+
+Set `VITE_DEV_TOKEN` in `.env` to the JWT supplied by the existing Venue/Auth
+workflow, then restart Vite. When logging in as the owner demo, a supplied
+`VENUE_OWNER` JWT is used as the active session so venue filtering uses its original
+`sub`, not the fixed demo UUID. If you were already logged in as the owner demo,
+sign out and log in again after configuring the token. Organizer demo login
+continues using the Events mock credential, including when a Venue JWT is configured.
+
+Signing out clears stored credentials and suppresses development-token fallback
+across reloads. An explicit login re-enables it. Without a supplied JWT, owner demo
+screens remain available but Venue calls omit Authorization; no JWT is fabricated.
+The frontend only decodes claims for selection and display. Venue is responsible
+for checking the supplied token; live backend acceptance remains unverified.
+
+### Invitation registration (T-095)
+
+Choose **Registrarme con invitación** on login, or open `/register`. Enter a
+username, password (at least eight characters), confirmation, and invitation code.
+There is no role selector: the invitation determines the role. The current
+Ninjava contract uses usernames, not email addresses; the original email-shaped
+demo usernames still work on login.
+
+Demo invitations: `K7PX-3MZQ-9HTA` for an organizer, `V7PX-3MZQ-9HTA` for an owner.
+After registration, use the form's **Iniciar sesión** link and sign in with the new
+credentials. Each invitation can be used once per page lifetime. Duplicate usernames
+and invalid/used codes show errors without consuming valid codes on failure.
+
+This remains frontend-only authentication. Accounts reuse the existing backend
+fixture identities; credentials and invitation-use state reset on page reload.
+No Auth API is called and new passwords are not persisted. See
+[the Ninjava contract reference](context/product/mvp-03-partner-access.md).
+
+T-096 verifies that registration exposes only username, passwords, and invitation
+code, with no hidden or selectable role field. The request allowlist excludes role
+and identity metadata, including inherited properties. Mock adapter tests bypass
+the form and attempt role spoofing for both invitation types; subsequent login
+must still have the invitation's role. These are frontend/mock contract checks,
+not a substitute for authorization by the real Auth service.
+
+T-097 adds live password and confirmation feedback after typing or leaving a field.
+The minimum is eight characters; there are no additional case, number, or symbol
+rules. Changing the original password rechecks confirmation immediately. Passwords
+are not trimmed or case-normalized. Invalid values block registration, and submitting
+an invalid form focuses the first field with an error. The form and mock adapter
+share the same length policy.
+
+To check manually at `/register`, enter seven characters and verify the inline
+minimum error, then add an eighth. Enter a different confirmation, correct it,
+and change the original password again: confirmation should become invalid again.
+Use a length-only password such as `abcdefgh` to verify that no extra character
+requirements are imposed. Empty fields should not show errors before interaction.
+
+### Unauthenticated redirects (T-094)
+
+Without a valid session, opening any protected Backstage path redirects to `/login` before
+protected views mount or issue requests. Malformed credentials, unknown mock IDs,
+and expired JWTs are treated as signed out. Active JWT expiry updates the UI;
+mock sessions have no expiration. An API `401` clears the rejected credential
+before returning to login. Redirects replace browser history and avoid repeating
+the same navigation. `/login` and invitation registration at `/register` are public.
+
+To check manually, sign out and open `/events`, `/venues/register`, and `/` directly.
+Each should show login at `/login`. Sign in, sign out, and press Back: protected
+content must stay unavailable. To test an invalid session, set
+`ds-aster.access-token` to `mock:unknown` in browser localStorage, then reload a
+protected URL.
+
+### Partner role guards (T-092)
+
+Organizers can open Events views; venue owners can open Venue views. Direct links
+to the other role's section display an access-denied panel with a link back to the
+partner's panel. Unknown pages display a not-found panel. Denied views do not mount
+or start API requests. Venue actions are hidden for other roles; existing local
+edit/delete handlers also check ownership. Event create/update permissions are
+defined for the upcoming integration, with deletion excluded.
+
+To check manually, sign in as the organizer and open `/` and `/venues/register`.
+Both should show access denied. Sign in as the owner and open `/events`; it should
+also show access denied. `/unknown` should show page not found for either account.
+The organizer header must not show **Registrar recinto**. Switching accounts
+resets view state so the previous partner's data cannot remain on screen.
+
+### Event registration (T-091)
+
+Sign in as `organizer@example.com` and choose **Registrar evento**, or open
+`/events/register`. The form requests the existing Venue catalogue each time it
+opens, without applying the owner filter used by “Mis recintos”. The Venue service
+must expose the complete catalogue to the organizer; that backend behavior and
+acceptance of the supplied Venue JWT are still unverified. Catalogue errors and
+empty results disable submission instead of supplying fake venue records.
+
+Enter a future date/time in the displayed browser timezone. The frontend converts
+it to UTC and sends `POST /api/v1/events`, with the session bearer token and no
+organizer identity in the body. Venue IDs must be UUIDs. Success displays the
+server's `201` confirmation; errors preserve the form and allow retry. Repeated
+clicks while a request is pending are blocked. The API has no idempotency key, so
+this does not guarantee deduplication after an interrupted response or manual retry.
+
+For local testing, run Events on port 3000 and configure `VITE_API_BASE_URL` for
+your Venue service. Leave `VITE_EVENTS_API_BASE_URL` empty to use the separate
+`/events-api` development proxy, or set it to the Events service origin.
 
 ---
 
@@ -74,8 +195,29 @@ cp .env.example .env
 | Variable | Description | Default |
 |---|---|---|
 | `VITE_API_BASE_URL` | Base URL for the venue-service API or gateway | `/api` |
+| `VITE_EVENTS_API_BASE_URL` | Events service origin (without `/api/v1/events`) | `/events-api` |
+| `VITE_DEV_TOKEN` | Existing Venue/Auth JWT for the development credential workflow | Empty |
 
-`VITE_API_BASE_URL` currently configures only the Venue client. Events will need a separate service URL or gateway route; no Events client/configuration exists yet. The existing `/api` development proxy has a single upstream.
+`VITE_API_BASE_URL` configures the existing Venue client. Events uses a separate
+client and `/events-api` development proxy that preserves `/api/v1/events`.
+Production hosting must configure that proxy or supply an Events origin with CORS.
+
+### Organizer event list (T-147)
+
+`/events` now requests `GET /api/v1/events` with the current organizer ID, page,
+and page size. It displays name, artist, scheduled times in the browser timezone,
+venue name, and status. Page sizes are 10, 25, and 50. Changing the page size starts
+at page one; a page that disappears after concurrent changes returns to the last
+available page. Loading, empty, and error states include registration/retry actions.
+
+Venue names load independently through the existing Venue client. A catalogue
+failure leaves the event list usable and offers a separate retry. Session changes
+reset the view and cancel previous requests. The frontend organizer filter is a
+management-view restriction, not backend authorization: the existing read API is public.
+
+Event cards link to `/events/{id}` for T-148, which is still pending. Live browser
+verification of T-147 requires running the frontend development server; automated
+coverage includes request contracts, pagination, response filtering, and rendered UI.
 
 ### Running Locally
 
@@ -100,7 +242,7 @@ npm run preview
 | Build | `npm run build` | Compiles production assets into `dist/` |
 | Preview | `npm run preview` | Serves the production build locally |
 | Lint | `npm run lint` | Runs ESLint across all source files |
-| Test | `npm test` | Currently skips tests; no test runner is configured |
+| Test | `npm test` | Runs authentication tests with the built-in Node.js test runner |
 
 ---
 

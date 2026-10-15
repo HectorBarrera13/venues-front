@@ -1,5 +1,7 @@
-import { useCallback, useRef, useState } from 'react'
-import venueApiClient from '../services/VenueApiClient.js'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import venueApiClient, { ApiClientError } from '../services/VenueApiClient.js'
+import { getSession } from '../auth/session.js'
+import { canPerformAction } from '../auth/access.js'
 
 /**
  * useCreateVenue
@@ -27,6 +29,7 @@ function useCreateVenue() {
   const [isSuccess, setIsSuccess] = useState(false)
   const [venue, setVenue] = useState(null)
   const requestIdRef = useRef(0)
+  useEffect(() => () => { requestIdRef.current += 1 }, [])
 
   const reset = useCallback(() => {
     requestIdRef.current += 1 // invalidate any in-flight request
@@ -43,15 +46,22 @@ function useCreateVenue() {
       setError(null)
       setIsSuccess(false)
 
+      const session = getSession()
+      if (!canPerformAction(session, 'venues.create')) {
+        setError(new ApiClientError('No tienes permiso para registrar recintos.', session ? 403 : 401))
+        setIsLoading(false)
+        return undefined
+      }
+
       try {
         const createdVenue = await venueApiClient.createVenue(data)
-        if (requestIdRef.current !== requestId) return undefined // superseded by a newer call or a reset()
+        if (requestIdRef.current !== requestId || getSession()?.token !== session.token) return undefined
 
         setVenue(createdVenue)
         setIsSuccess(true)
         return createdVenue
       } catch (requestError) {
-        if (requestIdRef.current !== requestId) return undefined
+        if (requestIdRef.current !== requestId || getSession()?.token !== session.token) return undefined
         setError(requestError)
         setIsSuccess(false)
         return undefined

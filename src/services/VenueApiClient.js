@@ -1,4 +1,4 @@
-import { getToken } from '../auth/token.js'
+import { getVenueToken } from '../auth/token.js'
 
 // A 400 names the field it rejected; these are the words it may use in that
 // name or in its message, so a validation error can land next to its input.
@@ -74,7 +74,7 @@ class ApiClientError extends Error {
 }
 
 class VenueApiClient {
-  constructor(baseUrl = import.meta.env.VITE_API_BASE_URL ?? '/api') {
+  constructor(baseUrl = import.meta.env?.VITE_API_BASE_URL ?? '/api') {
     this.baseUrl = baseUrl.replace(/\/$/, '')
   }
 
@@ -93,7 +93,7 @@ class VenueApiClient {
    * @throws {Error} On network failures or an unexpected response body.
    */
   async getVenues({ signal } = {}) {
-    const token = getToken()
+    const token = getVenueToken()
 
     let response
     try {
@@ -140,7 +140,7 @@ class VenueApiClient {
    * @throws {Error} On network failures or an unexpected response body.
    */
   async createVenue(data, { signal } = {}) {
-    const token = getToken()
+    const token = getVenueToken()
 
     let response
     try {
