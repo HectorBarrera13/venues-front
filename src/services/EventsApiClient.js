@@ -106,6 +106,45 @@ export class EventsApiClient {
     }
     return payload
   }
+
+  async updateEvent(id, data, { signal } = {}) {
+    if (typeof id !== 'string' || !id.trim()) {
+      throw new EventApiError('Identificador de evento inválido.', 400)
+    }
+    let response
+    try {
+      response = await fetch(`${this.baseUrl}/api/v1/events/${encodeURIComponent(id.trim())}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+          Authorization: `Bearer ${getEventsToken()}`,
+        },
+        body: JSON.stringify({
+          name: data.name,
+          artist: data.artist,
+          date: data.date,
+          venue_id: data.venue_id,
+        }),
+        signal,
+      })
+    } catch (error) {
+      if (error.name === 'AbortError') throw error
+      throw new Error('No fue posible conectar con Events.', { cause: error })
+    }
+    const payload = await response.json().catch(() => null)
+    if (!response.ok) {
+      const fallback = {
+        400: 'Revisa el nombre, artista y fecha del evento.',
+        401: 'Tu sesión no es válida. Inicia sesión de nuevo.',
+        403: 'Solo el organizador propietario puede editar este evento.',
+        404: 'El evento no existe o fue retirado.',
+        422: 'El recinto o los datos del evento no son válidos.',
+      }[response.status] || 'No pudimos actualizar el evento. Inténtalo de nuevo.'
+      throw new EventApiError(typeof payload?.error === 'string' ? payload.error : fallback, response.status)
+    }
+    return payload
+  }
 }
 
 export default new EventsApiClient()
