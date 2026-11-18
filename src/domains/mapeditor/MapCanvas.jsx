@@ -99,13 +99,7 @@ function MapCanvas({
     if (event.button === 1 || event.altKey) { startPan(event); return }
     if (readOnly) return
     const point = toNormalized(event)
-    if (tool === TOOLS.SELECT && (event.target === svgRef.current || event.target.dataset.background === '1')) {
-      // In select mode an empty-area drag pans unless the editor claims it (marquee)
-      // via onDown returning false.
-      dragRef.current = { last: { x: event.clientX, y: event.clientY } }
-      svgRef.current.setPointerCapture(event.pointerId)
-      return
-    }
+    dragRef.current = null
     onDown?.(point, event)
   }
 

@@ -82,3 +82,21 @@ export function seatsInRect(seats, from, to) {
   return seats.filter((seat) => seat.position.x >= minX && seat.position.x <= maxX
     && seat.position.y >= minY && seat.position.y <= maxY)
 }
+
+/**
+ * Live problems of a block preview (VEN-504/507): positions that leave [0, 1]
+ * and existing seats that would overlap the ghost (same 0.005 rule as R6a).
+ * The editor uses this to refuse committing an invalid block without any HTTP call.
+ */
+export function blockProblems(layout, existingSeats, { minimum = 0.005 } = {}) {
+  const outOfBounds = []
+  const overlapSeatIds = new Set()
+  for (const item of layout) {
+    const { x, y } = item.position
+    if (x < -1e-9 || x > 1 + 1e-9 || y < -1e-9 || y > 1 + 1e-9) outOfBounds.push(item)
+    for (const seat of existingSeats) {
+      if (Math.hypot(x - seat.position.x, y - seat.position.y) < minimum - 1e-12) overlapSeatIds.add(seat.id)
+    }
+  }
+  return { outOfBounds, overlapSeatIds: [...overlapSeatIds], valid: outOfBounds.length === 0 && overlapSeatIds.size === 0 }
+}

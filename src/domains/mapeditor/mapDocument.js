@@ -88,6 +88,40 @@ function normalizeRotation(value, field) {
 }
 
 /**
+ * Raw grid for a block: positions before rounding, in seat order (row by row),
+ * rotated clockwise around `origin`. Shared by `addBlock` and the editor's
+ * live preview so the ghost and the committed seats can never drift apart.
+ */
+export function computeBlockPositions({
+  origin,
+  rows = 1,
+  seatsPerRow = 1,
+  spacing,
+  rowSpacing = spacing,
+  rotation = 0,
+} = {}) {
+  const angle = (rotation * Math.PI) / 180
+  const cos = Math.cos(angle)
+  const sin = Math.sin(angle)
+  const layout = []
+  for (let row = 0; row < rows; row += 1) {
+    for (let column = 0; column < seatsPerRow; column += 1) {
+      const along = column * spacing
+      const across = row * rowSpacing
+      layout.push({
+        row,
+        column,
+        position: {
+          x: origin.x + along * cos - across * sin,
+          y: origin.y + along * sin + across * cos,
+        },
+      })
+    }
+  }
+  return layout
+}
+
+/**
  * Creates an empty document, or one seeded with `content` (already-validated
  * `{ stage, zones, seats }`). Use `loadMapDocument` to parse an unknown payload.
  */
@@ -216,31 +250,29 @@ export function createMapDocument(content = {}) {
       const angle = normalizeRotation(rotation, 'block.rotation')
       const start = requirePoint(origin ?? {}, 'block.origin')
       if (zone !== null && !findZone(state, zone)) fail('UNKNOWN_ZONE', `There is no zone "${zone}"`)
-      const rowStep = Math.cos((angle * Math.PI) / 180)
-      const rowLift = Math.sin((angle * Math.PI) / 180)
+      const layout = computeBlockPositions({
+        origin: start, rows, seatsPerRow, spacing, rowSpacing, rotation: angle,
+      })
 
       return transact((draft) => {
         const created = []
         let name = firstRow
-        for (let row = 0; row < rows; row += 1) {
-          for (let column = 0; column < seatsPerRow; column += 1) {
-            const along = column * spacing
-            const across = row * rowSpacing
-            const position = requirePoint({
-              x: start.x + along * rowStep - across * rowLift,
-              y: start.y + along * rowLift + across * rowStep,
-            }, `block.seats[${created.length}].position`)
-            const seat = makeSeat(draft, {
-              label: String(firstNumber + column),
-              row: name,
-              zone,
-              position,
-              rotation: angle,
-            })
-            draft.seats.push(seat)
-            created.push(seat)
+        let lastRow = -1
+        for (const item of layout) {
+          if (item.row !== lastRow) {
+            if (lastRow !== -1) name = nextRowName(name)
+            lastRow = item.row
           }
-          name = nextRowName(name)
+          const position = requirePoint(item.position, `block.seats[${created.length}].position`)
+          const seat = makeSeat(draft, {
+            label: String(firstNumber + item.column),
+            row: name,
+            zone,
+            position,
+            rotation: angle,
+          })
+          draft.seats.push(seat)
+          created.push(seat)
         }
         return clone(created)
       })
@@ -251,6 +283,18 @@ export function createMapDocument(content = {}) {
         const seat = requireSeat(draft, id)
         seat.position = requirePoint(position ?? {}, 'seat.position')
         return clone(seat)
+      })
+    },
+
+    /** Moves several seats by the same delta as ONE undoable action (group drag). */
+    nudgeSeats(ids, delta) {
+      return transact((draft) => {
+        const moved = ids.map((id) => {
+          const seat = requireSeat(draft, id)
+          seat.position = requirePoint({ x: seat.position.x + delta.x, y: seat.position.y + delta.y }, `seat ${seat.id}`)
+          return clone(seat)
+        })
+        return moved
       })
     },
 
