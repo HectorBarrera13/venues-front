@@ -16,6 +16,7 @@ import PartnerRegister from "./components/PartnerRegister.jsx";
 import OrganizerEventsPage from "./components/OrganizerEventsPage.jsx";
 import EventDetailPage from "./domains/events/detail/EventDetailPage.jsx";
 import EventEditPage from "./domains/events/edit/EventEditPage.jsx";
+import MapEditorPage from "./domains/mapeditor/MapEditorPage.jsx";
 
 function App() {
   const { currentUser } = useCurrentUser();
@@ -33,11 +34,13 @@ function App() {
   const eventDetailId = eventDetailMatch && eventDetailMatch[1] !== "register"
     ? decodeURIComponent(eventDetailMatch[1])
     : null;
+  const mapMatch = currentPath.match(/^\/venues\/([^/]+)\/map$/);
+  const mapVenueId = mapMatch ? decodeURIComponent(mapMatch[1]) : null;
   const isRegisterRoute = currentPath === "/venues/register" || currentPath === "/events/register";
   const isSignInRoute = currentPath === SIGN_IN_PATH;
   const redirectTo = getSessionRedirect(currentPath, currentUser);
   const hasAccess = canAccessRoute(currentUser, currentPath);
-  const isKnownView = Boolean(eventEditId) || Boolean(eventDetailId) || ["/", "/venues", "/venues/register", "/events", "/events/register"].includes(currentPath);
+  const isKnownView = Boolean(eventEditId) || Boolean(eventDetailId) || Boolean(mapVenueId) || ["/", "/venues", "/venues/register", "/events", "/events/register"].includes(currentPath);
 
   useEffect(() => {
     if (redirectTo) replaceRoute(redirectTo);
@@ -72,6 +75,8 @@ function App() {
           <EventEditPage eventId={eventEditId} />
         ) : eventDetailId ? (
           <EventDetailPage eventId={eventDetailId} />
+        ) : mapVenueId ? (
+          <MapEditorPage venueId={mapVenueId} />
         ) : currentPath === "/events" ? (
           <OrganizerEventsPage />
         ) : currentPath === "/events/register" ? (

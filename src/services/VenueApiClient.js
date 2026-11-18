@@ -64,12 +64,15 @@ class ApiClientError extends Error {
    *   backend's { error: message } body when available).
    * @param {number} status - HTTP status code (e.g. 400, 403, 500).
    * @param {string | null} [field] - Venue field a 400 rejected, when known.
+   * @param {object} [details] - Parsed error body for structured failures; the
+   *   422 map validation list rides here as `details.errors`.
    */
-  constructor(message, status, field = null) {
+  constructor(message, status, field = null, details = undefined) {
     super(message)
     this.name = 'ApiClientError'
     this.status = status
     this.field = field
+    this.details = details
   }
 }
 
@@ -140,6 +143,62 @@ class VenueApiClient {
       throw new Error('El servidor devolvió una respuesta inesperada.')
     }
 
+    return payload
+  }
+
+  /**
+   * Reads one venue.
+   *
+   * @param {string} venueId
+   * @param {{ signal?: AbortSignal }} [options]
+   * @returns {Promise<object>} the venue with `ownerId` and `latestMapVersion`
+   * @throws {ApiClientError} 401/403/404 with the backend message.
+   */
+  async getVenue(venueId, { signal } = {}) {
+    const token = getVenueToken()
+    let response
+    try {
+      response = await fetch(`${this.baseUrl}/venues/${encodeURIComponent(venueId)}`, {
+        headers: { Accept: 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        signal,
+      })
+    } catch (error) {
+      if (error.name === 'AbortError') throw error
+      throw new Error('No fue posible conectar con el servidor.', { cause: error })
+    }
+    const payload = await response.json().catch(() => null)
+    if (!response.ok) {
+      throw new ApiClientError(payload?.error || 'No pudimos cargar el recinto.', response.status)
+    }
+    return payload
+  }
+
+  /**
+   * Reads a saved seat map (MapVersion). GET /venues/{id}/map, optionally ?version=N.
+   *
+   * @param {string} venueId
+   * @param {{ version?: number, signal?: AbortSignal }} [options]
+   * @returns {Promise<object>} { venueId, version, createdAt, stage, zones, seats }
+   * @throws {ApiClientError} 404 when the venue has no map yet (or the version
+   *   does not exist) — callers treat that as "draw the first map".
+   */
+  async getMap(venueId, { version, signal } = {}) {
+    const token = getVenueToken()
+    const query = version === undefined ? '' : `?version=${encodeURIComponent(version)}`
+    let response
+    try {
+      response = await fetch(`${this.baseUrl}/venues/${encodeURIComponent(venueId)}/map${query}`, {
+        headers: { Accept: 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        signal,
+      })
+    } catch (error) {
+      if (error.name === 'AbortError') throw error
+      throw new Error('No fue posible conectar con el servidor.', { cause: error })
+    }
+    const payload = await response.json().catch(() => null)
+    if (!response.ok) {
+      throw new ApiClientError(payload?.error || 'No pudimos cargar el mapa.', response.status)
+    }
     return payload
   }
 
