@@ -197,10 +197,57 @@ cp .env.example .env
 | `VITE_API_BASE_URL` | Base URL for the venue-service API or gateway | `/api` |
 | `VITE_EVENTS_API_BASE_URL` | Events service origin (without `/api/v1/events`) | `/events-api` |
 | `VITE_DEV_TOKEN` | Existing Venue/Auth JWT for the development credential workflow | Empty |
+| `VITE_USE_MOCK` | `true` serves the venue-service contract from the in-browser mock (VEN-005) | Empty (off) |
 
 `VITE_API_BASE_URL` configures the existing Venue client. Events uses a separate
 client and `/events-api` development proxy that preserves `/api/v1/events`.
 Production hosting must configure that proxy or supply an Events origin with CORS.
+
+### Venue contract mock (VEN-005)
+
+The Venue API can be served by a deterministic in-browser mock built with
+[MSW](https://mswjs.io), so the Backstage runs with no backend at all:
+
+```bash
+cp .env.example .env
+# in .env:
+#   VITE_USE_MOCK = true
+#   VITE_DEV_TOKEN = eyJhbGciOiJub25lIiwidHlwIjoiSldUIn0.eyJzdWIiOiIyMjIyMjIyMi0yMjIyLTIyMjItMjIyMi0yMjIyMjIyMjIyMjIiLCJyb2xlIjoiVkVOVUVfT1dORVIiLCJuYW1lIjoiUHJvcGlldGFyaW8gZGVtbyJ9.mock
+npm run dev
+```
+
+Sign in as `owner@example.com` / `Backstage123!`. The demo JWT above is unsigned and only the mock
+accepts it; its `sub` is the demo owner, who owns the seeded venues.
+
+What the mock serves (contract: `openapi.json` and `docs/map-format.md` in the `venues` repository):
+
+| Request | Mock behaviour |
+|---|---|
+| `GET /venues` | `{ data, pagination }` with `page`/`limit` and the `country`, `city`, `name`, `lat`+`lng`+`radius_km` filters. A filter with no match returns an empty page. |
+| `POST /venues` | Same `400` rules as the backend (the message names the field), `409 { error, existingVenueId }` for a duplicate `osmRef` (seeded: `way:24930346`), `201` otherwise |
+| `GET /venues/{id}` | `200` / `404` |
+| `POST /venues/{id}/map` | `403` unless the token owns the venue, `400` for malformed payloads, `422` for the shared invalid fixtures, `201` with versions `1`, `2`, … |
+| `GET /venues/{id}/map[?version=N]` | Latest or given version; `404` without map or for an unknown version |
+
+Every request needs `Authorization: Bearer <JWT>` (`401` otherwise) with role `VENUE_OWNER` or `ORGANIZER`.
+The data lives in memory, so a reload restarts from the same three seeded venues, ids and timestamps.
+
+**Forcing a `422`.** The mock does not run the map rules: it answers `422` when the saved map is exactly
+one of the invalid fixtures. To see any `422` while drawing a map, set the scenario in the browser console
+and save:
+
+```js
+localStorage.setItem('venues-mock:map-scenario', 'multi-error.json') // any file of src/mocks/fixtures/maps
+localStorage.removeItem('venues-mock:map-scenario')                  // back to 201
+```
+
+**Fixtures.** `src/mocks/fixtures/maps/` is a copy of `tests/fixtures/maps/` from the `venues`
+repository at the commit written in `SOURCE`. Never edit it by hand; refresh it with
+`scripts/sync-map-fixtures.sh <commit>`.
+
+**Switching to the real backend** only means removing `VITE_USE_MOCK` (and using a real JWT):
+the client code, URLs and payloads are the same. The `/api` dev proxy in `vite.config.js` keeps
+pointing at `localhost:3000`.
 
 ### Organizer event list (T-147)
 

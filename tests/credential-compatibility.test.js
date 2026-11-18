@@ -100,13 +100,16 @@ test('actual Venue and Events clients send separate credentials and preserve req
     requests.push({ url, options })
     if (url.includes('/api/v1/events')) return Response.json({ id: 'event', name: 'Concert', date: '2099-12-01T20:00:00Z', venue_id: 'venue' }, { status: 201 })
     if (options.method === 'POST') return Response.json({ id: 'venue', ownerId: 'original-venue-owner' }, { status: 201 })
-    return Response.json([{ id: 'venue', ownerId: 'original-venue-owner' }])
+    return Response.json({
+      data: [{ id: 'venue', ownerId: 'original-venue-owner' }],
+      pagination: { page: 1, limit: 100, total: 1, totalPages: 1 },
+    })
   })
   const venues = new VenueApiClient('http://venue.example')
   await venues.getVenues()
   await venues.createVenue({ name: ' Arena ', description: ' Description ', location: ' City ' })
   await new EventsApiClient('http://events.example').createEvent({ name: 'Concert', artist: 'Artist', date: '2099-12-01T20:00:00Z', venue_id: 'venue' })
-  assert.equal(requests[0].url, 'http://venue.example/venues')
+  assert.equal(requests[0].url, 'http://venue.example/venues?page=1&limit=100')
   assert.equal(requests[0].options.headers.Authorization, `Bearer ${venueJwt}`)
   assert.equal(requests[1].options.headers.Authorization, `Bearer ${venueJwt}`)
   assert.deepEqual(JSON.parse(requests[1].options.body), { name: 'Arena', description: 'Description', location: 'City' })
@@ -119,7 +122,7 @@ test('without a supplied JWT, mock owner login sends no credential to Venue', as
   persistToken(ownerMock)
   context.mock.method(globalThis, 'fetch', async (_url, options) => {
     assert.equal(Object.hasOwn(options.headers, 'Authorization'), false)
-    return Response.json([])
+    return Response.json({ data: [], pagination: { page: 1, limit: 100, total: 0, totalPages: 0 } })
   })
   await new VenueApiClient('http://venue.example').getVenues()
   persistToken(null)

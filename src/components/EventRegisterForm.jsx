@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { formatVenueLocation } from '../services/venueFormat.js'
 
 export default function EventRegisterForm({ catalogue, submission, onSubmit, onReload }) {
   const [form, setForm] = useState({ name: '', artist: '', date: '', venue_id: '' })
@@ -48,7 +49,7 @@ export default function EventRegisterForm({ catalogue, submission, onSubmit, onR
               disabled={catalogue.loading || Boolean(catalogue.error) || submission.pending}
               aria-invalid={Boolean(submission.fields.venue_id)}>
               <option value="">Selecciona un recinto</option>
-              {catalogue.venues.map((venue) => <option key={venue.id} value={venue.id}>{venue.name}{venue.location ? ` · ${venue.location}` : ''}</option>)}
+              {catalogue.venues.map((venue) => <option key={venue.id} value={venue.id}>{venue.name}{formatVenueLocation(venue) ? ` · ${formatVenueLocation(venue)}` : ''}</option>)}
             </select>
             {submission.fields.venue_id && <p className="form-error" role="alert">{submission.fields.venue_id}</p>}
           </div>

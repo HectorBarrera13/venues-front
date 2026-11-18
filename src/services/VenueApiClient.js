@@ -73,17 +73,20 @@ class ApiClientError extends Error {
   }
 }
 
+// Largest page the API serves (GET /venues limit).
+const VENUE_PAGE_SIZE = 100
+
 class VenueApiClient {
   constructor(baseUrl = import.meta.env?.VITE_API_BASE_URL ?? '/api') {
     this.baseUrl = baseUrl.replace(/\/$/, '')
   }
 
   /**
-   * Lists the venues visible to the current session.
+   * Lists every registered venue.
    *
-   * GETs /venues with the access token as a Bearer credential, the same
-   * credential POST /venues uses. The backend resolves the owner from the
-   * token, so the request carries no query parameters.
+   * GETs /venues page by page (the API answers `{ data, pagination }`) with the
+   * access token as a Bearer credential, and returns the venues of all pages,
+   * so callers keep receiving one complete array.
    *
    * @param {{ signal?: AbortSignal }} [options]
    * @returns {Promise<object[]>} The venues, as returned by the API
@@ -93,11 +96,28 @@ class VenueApiClient {
    * @throws {Error} On network failures or an unexpected response body.
    */
   async getVenues({ signal } = {}) {
+    const venues = []
+    for (let page = 1; ; page += 1) {
+      const { data, pagination } = await this.getVenuePage({ page, limit: VENUE_PAGE_SIZE }, { signal })
+      venues.push(...data)
+      if (page >= pagination.totalPages) return venues
+    }
+  }
+
+  /**
+   * Fetches one page of GET /venues.
+   *
+   * @param {{ page?: number, limit?: number }} query
+   * @param {{ signal?: AbortSignal }} [options]
+   * @returns {Promise<{ data: object[], pagination: { page: number, limit: number, total: number, totalPages: number } }>}
+   */
+  async getVenuePage({ page = 1, limit = VENUE_PAGE_SIZE } = {}, { signal } = {}) {
     const token = getVenueToken()
+    const query = new URLSearchParams({ page: String(page), limit: String(limit) })
 
     let response
     try {
-      response = await fetch(`${this.baseUrl}/venues`, {
+      response = await fetch(`${this.baseUrl}/venues?${query}`, {
         headers: {
           Accept: 'application/json',
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
@@ -116,7 +136,7 @@ class VenueApiClient {
       throw new ApiClientError(message, response.status)
     }
 
-    if (!Array.isArray(payload)) {
+    if (!Array.isArray(payload?.data) || !Number.isInteger(payload?.pagination?.totalPages)) {
       throw new Error('El servidor devolvió una respuesta inesperada.')
     }
 

@@ -1,0 +1,121 @@
+{
+  "contract": "docs/map-format.md",
+  "fixtures": {
+    "valid-v1.json": {
+      "description": "Stage, three zones (one non-rectangular), row blocks, loose seats and rotations. Produces no error.",
+      "expectedErrors": []
+    },
+    "seat-without-zone.json": {
+      "description": "Three seats break R4: zone null, unknown zone id, and position outside its zone outline.",
+      "expectedErrors": [
+        {
+          "code": "SEAT_WITHOUT_ZONE",
+          "seatIds": [
+            "s-lost-null",
+            "s-lost-ghost",
+            "s-lost-outside"
+          ]
+        }
+      ]
+    },
+    "empty-zone.json": {
+      "description": "Zone z-vip has no seats.",
+      "expectedErrors": [
+        {
+          "code": "EMPTY_ZONE",
+          "zoneIds": [
+            "z-vip"
+          ]
+        }
+      ]
+    },
+    "overlap-seats.json": {
+      "description": "Seat s-floor-A-02 is 0.003 away from s-floor-A-01 (minimum 0.005).",
+      "expectedErrors": [
+        {
+          "code": "OVERLAP",
+          "seatIds": [
+            "s-floor-A-01",
+            "s-floor-A-02"
+          ]
+        }
+      ]
+    },
+    "overlap-zones.json": {
+      "description": "The balcony outline starts at y=0.5, inside the floor (which ends at y=0.55).",
+      "expectedErrors": [
+        {
+          "code": "OVERLAP",
+          "zoneIds": [
+            "z-floor",
+            "z-balcony"
+          ]
+        }
+      ]
+    },
+    "unnamed-zone.json": {
+      "description": "Zone z-balcony has a blank name.",
+      "expectedErrors": [
+        {
+          "code": "UNNAMED_ZONE",
+          "zoneIds": [
+            "z-balcony"
+          ]
+        }
+      ]
+    },
+    "duplicate-label.json": {
+      "description": "Seats s-floor-A-01 and s-floor-A-02 are both row A, label 1, in z-floor.",
+      "expectedErrors": [
+        {
+          "code": "DUPLICATE_LABEL",
+          "seatIds": [
+            "s-floor-A-01",
+            "s-floor-A-02"
+          ],
+          "zoneIds": [
+            "z-floor"
+          ]
+        }
+      ]
+    },
+    "no-stage.json": {
+      "description": "stage is null.",
+      "expectedErrors": [
+        {
+          "code": "NO_STAGE"
+        }
+      ]
+    },
+    "multi-error.json": {
+      "description": "Breaks four rules at once: no stage, unnamed z-box, empty z-vip, duplicate A-1 in z-floor.",
+      "expectedErrors": [
+        {
+          "code": "NO_STAGE"
+        },
+        {
+          "code": "UNNAMED_ZONE",
+          "zoneIds": [
+            "z-box"
+          ]
+        },
+        {
+          "code": "EMPTY_ZONE",
+          "zoneIds": [
+            "z-vip"
+          ]
+        },
+        {
+          "code": "DUPLICATE_LABEL",
+          "seatIds": [
+            "s-floor-A-01",
+            "s-floor-A-02"
+          ],
+          "zoneIds": [
+            "z-floor"
+          ]
+        }
+      ]
+    }
+  }
+}

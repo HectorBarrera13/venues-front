@@ -1,5 +1,6 @@
 import useCurrentUser from '../hooks/useCurrentUser.js'
 import { canManageVenue } from '../auth/access.js'
+import { formatVenueLocation } from '../services/venueFormat.js'
 
 function formatDate(value) {
   if (!value) return 'Fecha no disponible'
@@ -53,7 +54,7 @@ function VenueCard({ venue, onEdit, onDelete }) {
           <path d="M20 10c0 5-8 11-8 11S4 15 4 10a8 8 0 1 1 16 0Z" stroke="currentColor" strokeWidth="2" />
           <circle cx="12" cy="10" r="2.5" stroke="currentColor" strokeWidth="2" />
         </svg>
-        {venue.location || 'Ubicación por confirmar'}
+        {formatVenueLocation(venue) || 'Ubicación por confirmar'}
       </p>
       <p className="venue-description">
         {venue.description || 'Este recinto todavía no tiene una descripción.'}
