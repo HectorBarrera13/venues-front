@@ -8,6 +8,7 @@ import { TOOLS, toolGate } from './tools.js'
 import { blockProblems, rectIsUsable, rectOutline } from './geometry.js'
 import { computeBlockPositions, MapDocumentError } from './mapDocument.js'
 import { DEFAULT_VIEW } from './viewport.js'
+import { nextLooseLabel, renumberRow } from './labels.js'
 
 const TOOL_LABELS = {
   [TOOLS.SELECT]: 'Seleccionar',
@@ -23,15 +24,6 @@ const DEFAULT_BLOCK_FORM = {
   spacing: 2, // percentage of the canvas width
   rowSpacing: 2,
   rotation: 0,
-}
-
-/** Next number for a loose (row-less) seat: one after the highest numeric label. */
-function nextLooseLabel(seats) {
-  let highest = 0
-  for (const seat of seats) {
-    if (seat.row === null && /^\d+$/.test(seat.label)) highest = Math.max(highest, Number(seat.label))
-  }
-  return String(highest + 1)
 }
 
 function numberInput(value, onChange, { min, max, step = 1, suffix = '' } = {}) {
@@ -50,6 +42,41 @@ function numberInput(value, onChange, { min, max, step = 1, suffix = '' } = {}) 
   )
 }
 
+/**
+ * Edits one seat's label and row (VEN-505). The changes are committed on blur
+ * or Enter — one undo step per edit — and count as a manual edit, so the
+ * automatic renumbering skips this seat afterwards.
+ */
+function SeatInspector({ seat, onCommit, onRenumberRow, onDelete }) {
+  const [label, setLabel] = useState(seat?.label ?? '')
+  const [row, setRow] = useState(seat?.row ?? '')
+
+  if (!seat) return null
+  const commit = () => {
+    if (!label.trim()) return
+    onCommit({ label, row: row.trim() === '' ? null : row.trim() })
+  }
+
+  return (
+    <>
+      <h2>Asiento {seat.id}</h2>
+      <label>
+        Label
+        <input value={label} onChange={(event) => setLabel(event.target.value)} onBlur={commit} onKeyDown={(event) => event.key === 'Enter' && commit()} />
+      </label>
+      <label>
+        Fila (vacío = sin fila)
+        <input value={row} onChange={(event) => setRow(event.target.value)} onBlur={commit} onKeyDown={(event) => event.key === 'Enter' && commit()} />
+      </label>
+      {seat.row !== null && (
+        <button type="button" className="map-tool" onClick={onRenumberRow}>Renumerar fila (respeta edits manuales)</button>
+      )}
+      <button type="button" className="map-tool map-tool--danger" onClick={onDelete}>Eliminar asiento</button>
+      <p className="hint">Los labels duplicados dentro de la misma zona se marcan en el panel de problemas.</p>
+    </>
+  )
+}
+
 function SeatMapEditor({ venue, document: doc, savedVersion = 0 }) {
   const [revision, setRevision] = useState(0)
   const [tool, setTool] = useState(TOOLS.STAGE)
@@ -59,6 +86,8 @@ function SeatMapEditor({ venue, document: doc, savedVersion = 0 }) {
   const [selectedSeatIds, setSelectedSeatIds] = useState(() => new Set())
   const [conflictSeatIds, setConflictSeatIds] = useState(() => new Set())
   const [blockForm, setBlockForm] = useState(DEFAULT_BLOCK_FORM)
+  /** Seats whose label/row was edited by hand: automatic renumbering must never overwrite them. */
+  const [manualIds, setManualIds] = useState(() => new Set())
   const dragRef = useRef(null)
 
   const snapshot = useMemo(() => doc.serialize(), [doc, revision]) // eslint-disable-line react-hooks/exhaustive-deps -- revision intentionally invalidates the memo over the mutable document
@@ -326,11 +355,36 @@ function SeatMapEditor({ venue, document: doc, savedVersion = 0 }) {
                 {blockPreview && !blockPreview.problems.valid ? ' — posición inválida (rojo).' : '.'}
               </p>
             </>
-          ) : tool === TOOLS.SELECT && selectedSeatIds.size > 0 ? (
+          ) : selectedSeatIds.size === 1 ? (
+            <SeatInspector
+              key={[...selectedSeatIds][0]}
+              seat={snapshot.seats.find((seat) => selectedSeatIds.has(seat.id))}
+              onCommit={({ label, row }) => {
+                const id = [...selectedSeatIds][0]
+                run((target) => target.renameSeat(id, { label, row }))
+                setManualIds((current) => new Set(current).add(id))
+              }}
+              onRenumberRow={() => {
+                const id = [...selectedSeatIds][0]
+                const seat = doc.getSeat(id)
+                if (!seat || seat.row === null) return
+                run((target) => {
+                  for (const change of renumberRow(target.getSeats(), { row: seat.row, zone: seat.zone, manualIds })) {
+                    target.renameSeat(change.id, { label: change.label })
+                  }
+                })
+              }}
+              onDelete={() => run((target) => target.removeSeat([...selectedSeatIds][0]))}
+            />
+          ) : selectedSeatIds.size > 1 ? (
             <>
-              <h2>{selectedSeatIds.size === 1 ? 'Asiento seleccionado' : `${selectedSeatIds.size} asientos seleccionados`}</h2>
-              <p className="hint">Arrastra para mover, Supr para eliminar. Las etiquetas y zonas se editan en los siguientes pasos del editor.</p>
-              <button type="button" className="map-tool map-tool--danger" onClick={() => run((target) => { for (const id of selectedSeatIds) target.removeSeat(id) })}>
+              <h2>{`${selectedSeatIds.size} asientos seleccionados`}</h2>
+              <p className="hint">Arrastra uno de ellos para mover toda la selección como una sola acción.</p>
+              <button
+                type="button"
+                className="map-tool map-tool--danger"
+                onClick={() => run((target) => { for (const id of selectedSeatIds) target.removeSeat(id) })}
+              >
                 Eliminar selección
               </button>
             </>
