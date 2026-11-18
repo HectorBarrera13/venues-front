@@ -7,6 +7,7 @@ import MapCanvas from './MapCanvas.jsx'
 import { TOOLS, toolGate } from './tools.js'
 import { blockProblems, outlineForSeats, rectIsUsable, rectOutline, seatsInRect } from './geometry.js'
 import { computeBlockPositions, MapDocumentError } from './mapDocument.js'
+import { validateMap } from './validateMap.js'
 import { DEFAULT_VIEW } from './viewport.js'
 import { nextLooseLabel, renumberRow } from './labels.js'
 
@@ -111,6 +112,34 @@ function ZoneInspector({ zone, seatCount, pendingSeatIds, onRename, onAssignSele
   )
 }
 
+/**
+ * Live problem list (VEN-507): recomputed on every MapDocument change with the
+ * same codes as the C3 catalogue. The backend keeps the final word at save —
+ * this panel exists so the owner sees problems while drawing.
+ */
+function ProblemsPanel({ problems }) {
+  if (problems.length === 0) {
+    return (
+      <>
+        <h2>Problemas</h2>
+        <p className="map-problems--ok" role="status">Sin problemas: el mapa cumple las reglas del contrato.</p>
+      </>
+    )
+  }
+  return (
+    <>
+      <h2>Problemas ({problems.length})</h2>
+      <ul className="map-problems" aria-live="polite">
+        {problems.map((issue) => (
+          <li key={`${issue.code}-${issue.seatIds?.join(',') ?? ''}-${issue.zoneIds?.join(',') ?? ''}`}>
+            <span className="map-problems__code">{issue.code}</span> · {issue.message}
+          </li>
+        ))}
+      </ul>
+    </>
+  )
+}
+
 function SeatMapEditor({ venue, document: doc, savedVersion = 0 }) {
   const [revision, setRevision] = useState(0)
   const [tool, setTool] = useState(TOOLS.STAGE)
@@ -127,6 +156,7 @@ function SeatMapEditor({ venue, document: doc, savedVersion = 0 }) {
   const dragRef = useRef(null)
 
   const snapshot = useMemo(() => doc.serialize(), [doc, revision]) // eslint-disable-line react-hooks/exhaustive-deps -- revision intentionally invalidates the memo over the mutable document
+  const problems = useMemo(() => validateMap(snapshot), [snapshot])
   const hasStage = snapshot.stage !== null
   const refresh = () => setRevision((value) => value + 1)
 
@@ -347,6 +377,13 @@ function SeatMapEditor({ venue, document: doc, savedVersion = 0 }) {
     return []
   }, [blockPreview, draft])
 
+  const highlightSeats = new Set(conflictSeatIds)
+  const highlightZones = new Set()
+  for (const issue of problems) {
+    for (const id of issue.seatIds ?? []) highlightSeats.add(id)
+    for (const id of issue.zoneIds ?? []) highlightZones.add(id)
+  }
+
   return (
     <section className="map-editor" aria-label="Editor de mapa de asientos">
       <header className="map-editor__header">
@@ -406,7 +443,8 @@ function SeatMapEditor({ venue, document: doc, savedVersion = 0 }) {
             ghostSeats={ghostSeats}
             selectedSeatIds={selectedSeatIds}
             selectedZoneIds={selectedZoneIds}
-            highlightSeatIds={conflictSeatIds}
+            highlightSeatIds={highlightSeats}
+            highlightZoneIds={highlightZones}
             draft={draft?.kind === 'rect' || draft?.kind === 'polygon' ? draft : null}
             onDown={handlers.onDown}
             onMove={handlers.onMove}
@@ -514,6 +552,7 @@ function SeatMapEditor({ venue, document: doc, savedVersion = 0 }) {
               )}
             </>
           )}
+          <ProblemsPanel problems={problems} />
         </aside>
       </div>
     </section>
