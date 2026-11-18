@@ -5,7 +5,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import MapCanvas from './MapCanvas.jsx'
 import { TOOLS, toolGate } from './tools.js'
-import { blockProblems, rectIsUsable, rectOutline } from './geometry.js'
+import { blockProblems, outlineForSeats, rectIsUsable, rectOutline, seatsInRect } from './geometry.js'
 import { computeBlockPositions, MapDocumentError } from './mapDocument.js'
 import { DEFAULT_VIEW } from './viewport.js'
 import { nextLooseLabel, renumberRow } from './labels.js'
@@ -77,6 +77,40 @@ function SeatInspector({ seat, onCommit, onRenumberRow, onDelete }) {
   )
 }
 
+/**
+ * Edits one zone (VEN-506): name, delete, and moving the current seat
+ * selection into it. Its outline vertices appear on the canvas for dragging.
+ */
+function ZoneInspector({ zone, seatCount, pendingSeatIds, onRename, onAssignSelection, onDelete }) {
+  const [name, setName] = useState(zone.name)
+
+  if (!zone) return null
+  return (
+    <>
+      <h2>Zona {zone.id}</h2>
+      <label>
+        Nombre (obligatorio)
+        <input
+          value={name}
+          onChange={(event) => setName(event.target.value)}
+          onBlur={() => name.trim() && onRename(name)}
+          onKeyDown={(event) => event.key === 'Enter' && name.trim() && onRename(name)}
+        />
+      </label>
+      <p className="hint">
+        {seatCount} {seatCount === 1 ? 'asiento' : 'asientos'}. Arrastra los vértices del contorno para ajustarlo:
+        la pertenencia de los asientos es por zona, no por geometría.
+      </p>
+      {pendingSeatIds > 0 && (
+        <button type="button" className="map-tool" onClick={onAssignSelection}>
+          Mover los {pendingSeatIds} asientos seleccionados aquí
+        </button>
+      )}
+      <button type="button" className="map-tool map-tool--danger" onClick={onDelete}>Eliminar zona (libera sus asientos)</button>
+    </>
+  )
+}
+
 function SeatMapEditor({ venue, document: doc, savedVersion = 0 }) {
   const [revision, setRevision] = useState(0)
   const [tool, setTool] = useState(TOOLS.STAGE)
@@ -84,6 +118,8 @@ function SeatMapEditor({ venue, document: doc, savedVersion = 0 }) {
   const [notice, setNotice] = useState(null)
   const [view, setView] = useState(DEFAULT_VIEW)
   const [selectedSeatIds, setSelectedSeatIds] = useState(() => new Set())
+  const [selectedZoneIds, setSelectedZoneIds] = useState(() => new Set())
+  const [zoneName, setZoneName] = useState('')
   const [conflictSeatIds, setConflictSeatIds] = useState(() => new Set())
   const [blockForm, setBlockForm] = useState(DEFAULT_BLOCK_FORM)
   /** Seats whose label/row was edited by hand: automatic renumbering must never overwrite them. */
@@ -162,13 +198,22 @@ function SeatMapEditor({ venue, document: doc, savedVersion = 0 }) {
         commitBlock()
         return
       }
-      if (tool === TOOLS.SELECT) {
-        // Drag on empty space selects an area (zones land in VEN-506); a plain click clears.
+      if (tool === TOOLS.SELECT || tool === TOOLS.ZONE) {
+        // Drag on empty space marks an area; a plain click clears the selection.
         dragRef.current = { kind: 'maybe-marquee', from: point }
         setDraft(null)
       }
     },
     onMove(point) {
+      if (dragRef.current?.kind === 'vertex') {
+        const zone = snapshot.zones.find((entry) => entry.id === dragRef.current.zoneId)
+        if (!zone) return
+        const points = zone.outline.map((entry, index) => (
+          index === dragRef.current.vertex ? { x: Math.min(1, Math.max(0, point.x)), y: Math.min(1, Math.max(0, point.y)) } : entry
+        ))
+        setDraft({ kind: 'polygon', points })
+        return
+      }
       if (tool === TOOLS.STAGE && dragRef.current?.kind === 'stage') {
         setDraft({ kind: 'rect', from: dragRef.current.from, to: point })
         return
@@ -177,7 +222,7 @@ function SeatMapEditor({ venue, document: doc, savedVersion = 0 }) {
         setDraft({ kind: 'block-origin', origin: point })
         return
       }
-      if (tool === TOOLS.SELECT && dragRef.current?.kind === 'seat') {
+      if ((tool === TOOLS.SELECT || tool === TOOLS.ZONE) && dragRef.current?.kind === 'seat') {
         const delta = { x: point.x - dragRef.current.from.x, y: point.y - dragRef.current.from.y }
         const ghosts = snapshot.seats
           .filter((seat) => selectedSeatIds.has(seat.id))
@@ -185,14 +230,22 @@ function SeatMapEditor({ venue, document: doc, savedVersion = 0 }) {
         setDraft({ kind: 'drag', ghosts })
         return
       }
-      if (tool === TOOLS.SELECT && dragRef.current?.kind === 'maybe-marquee') {
+      if ((tool === TOOLS.SELECT || tool === TOOLS.ZONE) && dragRef.current?.kind === 'maybe-marquee') {
         dragRef.current = { kind: 'marquee', from: dragRef.current.from }
       }
-      if (tool === TOOLS.SELECT && dragRef.current?.kind === 'marquee') {
+      if ((tool === TOOLS.SELECT || tool === TOOLS.ZONE) && dragRef.current?.kind === 'marquee') {
         setDraft({ kind: 'rect', from: dragRef.current.from, to: point })
       }
     },
-    onUp(point) {
+    onUp(point, event) {
+      if (dragRef.current?.kind === 'vertex') {
+        const { zoneId } = dragRef.current
+        const points = draft?.kind === 'polygon' ? draft.points : null
+        dragRef.current = null
+        setDraft(null)
+        if (points) run((target) => target.setZoneOutline(zoneId, points))
+        return
+      }
       if (tool === TOOLS.STAGE && dragRef.current?.kind === 'stage') {
         const from = dragRef.current.from
         dragRef.current = null
@@ -200,7 +253,7 @@ function SeatMapEditor({ venue, document: doc, savedVersion = 0 }) {
         if (rectIsUsable(from, point)) run((target) => target.setStage({ outline: rectOutline(from, point) }))
         return
       }
-      if (tool === TOOLS.SELECT && dragRef.current?.kind === 'seat') {
+      if ((tool === TOOLS.SELECT || tool === TOOLS.ZONE) && dragRef.current?.kind === 'seat') {
         const { from, ids } = dragRef.current
         dragRef.current = null
         const delta = point ? { x: point.x - from.x, y: point.y - from.y } : { x: 0, y: 0 }
@@ -208,14 +261,17 @@ function SeatMapEditor({ venue, document: doc, savedVersion = 0 }) {
         if (Math.abs(delta.x) > 1e-9 || Math.abs(delta.y) > 1e-9) run((target) => target.nudgeSeats(ids, delta))
         return
       }
-      if (tool === TOOLS.SELECT && dragRef.current) {
+      if ((tool === TOOLS.SELECT || tool === TOOLS.ZONE) && dragRef.current) {
         const marquee = dragRef.current
         dragRef.current = null
+        setDraft(null)
         if (marquee.kind === 'marquee' && point) {
-          // Marquee selection is completed with the zone tool (VEN-506).
-          setDraft(null)
+          const inside = seatsInRect(snapshot.seats, marquee.from, point).map((seat) => seat.id)
+          setSelectedSeatIds((current) => (event?.shiftKey ? new Set([...current, ...inside]) : new Set(inside)))
+          setSelectedZoneIds(new Set())
         } else if (marquee.kind === 'maybe-marquee') {
           setSelectedSeatIds(new Set())
+          setSelectedZoneIds(new Set())
         }
       }
     },
@@ -235,6 +291,26 @@ function SeatMapEditor({ venue, document: doc, savedVersion = 0 }) {
       if (!selectedSeatIds.has(seat.id)) setSelectedSeatIds(new Set([seat.id]))
       dragRef.current = { kind: 'seat', from: seat.position, ids }
     },
+    onZoneDown(zoneId) {
+      setSelectedZoneIds(new Set([zoneId]))
+      setSelectedSeatIds(new Set())
+    },
+    onVertexDown(zoneId, vertex) {
+      dragRef.current = { kind: 'vertex', zoneId, vertex }
+    },
+  }
+
+  const zoneId = () => [...selectedZoneIds][0]
+
+  function createZoneFromSelection() {
+    run((target) => {
+      const members = target.getSeats().filter((seat) => selectedSeatIds.has(seat.id))
+      const zone = target.createZone({ name: zoneName.trim(), outline: outlineForSeats(members), seats: members.map((seat) => seat.id) })
+      setSelectedZoneIds(new Set([zone.id]))
+      setSelectedSeatIds(new Set())
+      setZoneName('')
+      return zone
+    })
   }
 
   function commitBlock() {
@@ -329,12 +405,15 @@ function SeatMapEditor({ venue, document: doc, savedVersion = 0 }) {
             seats={snapshot.seats}
             ghostSeats={ghostSeats}
             selectedSeatIds={selectedSeatIds}
+            selectedZoneIds={selectedZoneIds}
             highlightSeatIds={conflictSeatIds}
             draft={draft?.kind === 'rect' || draft?.kind === 'polygon' ? draft : null}
             onDown={handlers.onDown}
             onMove={handlers.onMove}
             onUp={handlers.onUp}
             onSeatDown={handlers.onSeatDown}
+            onZoneDown={handlers.onZoneDown}
+            onVertexDown={handlers.onVertexDown}
           />
         </div>
 
@@ -355,7 +434,7 @@ function SeatMapEditor({ venue, document: doc, savedVersion = 0 }) {
                 {blockPreview && !blockPreview.problems.valid ? ' — posición inválida (rojo).' : '.'}
               </p>
             </>
-          ) : selectedSeatIds.size === 1 ? (
+          ) : selectedSeatIds.size === 1 && tool !== TOOLS.ZONE ? (
             <SeatInspector
               key={[...selectedSeatIds][0]}
               seat={snapshot.seats.find((seat) => selectedSeatIds.has(seat.id))}
@@ -376,9 +455,42 @@ function SeatMapEditor({ venue, document: doc, savedVersion = 0 }) {
               }}
               onDelete={() => run((target) => target.removeSeat([...selectedSeatIds][0]))}
             />
+          ) : tool === TOOLS.ZONE && selectedSeatIds.size > 0 ? (
+            <>
+              <h2>Crear zona con {selectedSeatIds.size} asientos</h2>
+              <label>
+                Nombre (obligatorio)
+                <input
+                  value={zoneName}
+                  placeholder="Pista, Gradas, VIP…"
+                  onChange={(event) => setZoneName(event.target.value)}
+                />
+              </label>
+              <button type="button" className="primary-button" disabled={!zoneName.trim()} onClick={createZoneFromSelection}>
+                Crear zona
+              </button>
+              <p className="hint">El contorno se genera como envolvente de los asientos seleccionados; podrás ajustar sus vértices después.</p>
+            </>
+          ) : selectedZoneIds.size === 1 && snapshot.zones.some((zone) => selectedZoneIds.has(zone.id)) ? (
+            <ZoneInspector
+              zone={snapshot.zones.find((zone) => selectedZoneIds.has(zone.id))}
+              seatCount={snapshot.seats.filter((seat) => seat.zone === [...selectedZoneIds][0]).length}
+              pendingSeatIds={selectedSeatIds.size}
+              onRename={(name) => run((target) => target.renameZone(zoneId(), name))}
+              onAssignSelection={() => run((target) => target.moveToZone([...selectedSeatIds], zoneId()))}
+              onDelete={() => run((target) => { target.removeZone(zoneId()); setSelectedZoneIds(new Set()) })}
+            />
           ) : selectedSeatIds.size > 1 ? (
             <>
               <h2>{`${selectedSeatIds.size} asientos seleccionados`}</h2>
+              <label>
+                Mover a zona
+                <select defaultValue="" onChange={(event) => event.target.value && run((target) => target.moveToZone([...selectedSeatIds], event.target.value || null))}>
+                  <option value="" disabled>Elegir zona…</option>
+                  {snapshot.zones.map((zone) => <option key={zone.id} value={zone.id}>{zone.name || '(sin nombre)'}</option>)}
+                  <option value="">(sin zona)</option>
+                </select>
+              </label>
               <p className="hint">Arrastra uno de ellos para mover toda la selección como una sola acción.</p>
               <button
                 type="button"

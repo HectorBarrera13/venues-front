@@ -197,7 +197,7 @@ function MapCanvas({
           />
         )}
         {draft?.kind === 'polygon' && draft.points.length >= 2 && (
-          <polyline className="map-draft" points={polygonPoints(draft.points)} />
+          <polygon className="map-draft" points={polygonPoints(draft.points)} />
         )}
         {stage && !readOnly && tool === TOOLS.STAGE && (
           <text x={USER / 2} y={40} className="map-canvas__hint" textAnchor="middle">
