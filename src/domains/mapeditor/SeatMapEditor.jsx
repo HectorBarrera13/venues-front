@@ -144,7 +144,7 @@ function ProblemsPanel({ problems }) {
 
 function SeatMapEditor({ venue, document: doc, savedVersion: initialVersion = 0, readOnly = false, onForbidden }) {
   const [revision, setRevision] = useState(0)
-  const [tool, setTool] = useState(TOOLS.STAGE)
+  const [tool, setTool] = useState(readOnly ? TOOLS.SELECT : TOOLS.STAGE)
   const [draft, setDraft] = useState(null)
   const [notice, setNotice] = useState(null)
   const [view, setView] = useState(DEFAULT_VIEW)
@@ -189,6 +189,7 @@ function SeatMapEditor({ venue, document: doc, savedVersion: initialVersion = 0,
   }
 
   useEffect(() => {
+    if (readOnly) return undefined
     const onKeyDown = (event) => {
       if (!(event.metaKey || event.ctrlKey)) return
       if (event.key.toLowerCase() === 'z') {
@@ -218,6 +219,7 @@ function SeatMapEditor({ venue, document: doc, savedVersion: initialVersion = 0,
 
   const handlers = {
     onDown(point) {
+      if (readOnly) return
       if (tool === TOOLS.STAGE) {
         dragRef.current = { kind: 'stage', from: point }
         setDraft({ kind: 'rect', from: point, to: point })
@@ -436,19 +438,21 @@ function SeatMapEditor({ venue, document: doc, savedVersion: initialVersion = 0,
         </div>
         <span className="spacer" />
         <span className="event-status">{lastSavedVersion > 0 ? `v${lastSavedVersion}` : 'sin mapa'}</span>
-        <button
-          type="button"
-          className="primary-button"
-          disabled={readOnly || saving || problems.length > 0}
-          title={problems.length > 0 ? 'Resuelve los problemas del panel antes de guardar' : undefined}
-          onClick={handleSave}
-        >
-          {saving ? 'Guardando…' : 'Guardar mapa'}
-        </button>
+        {!readOnly && (
+          <button
+            type="button"
+            className="primary-button"
+            disabled={saving || problems.length > 0}
+            title={problems.length > 0 ? 'Resuelve los problemas del panel antes de guardar' : undefined}
+            onClick={handleSave}
+          >
+            {saving ? 'Guardando…' : 'Guardar mapa'}
+          </button>
+        )}
       </header>
 
       <div className="map-editor__toolbar" role="toolbar" aria-label="Herramientas del editor">
-        {Object.values(TOOLS).map((value) => {
+        {!readOnly && Object.values(TOOLS).map((value) => {
           const gate = toolGate(value, hasStage)
           return (
             <button
@@ -466,15 +470,24 @@ function SeatMapEditor({ venue, document: doc, savedVersion: initialVersion = 0,
         })}
         <span className="spacer" style={{ flex: 1 }} />
         <button type="button" className="map-tool" onClick={() => setView(DEFAULT_VIEW)}>Recentrar</button>
-        <button type="button" className="map-tool" disabled={!doc.canUndo()} onClick={() => run((target) => target.undo())}>Deshacer</button>
-        <button type="button" className="map-tool" disabled={!doc.canRedo()} onClick={() => run((target) => target.redo())}>Rehacer</button>
-        {hasStage && (
-          <button type="button" className="map-tool map-tool--danger" onClick={() => run((target) => target.clearStage())}>
-            Borrar escenario
-          </button>
+        {!readOnly && (
+          <>
+            <button type="button" className="map-tool" disabled={!doc.canUndo()} onClick={() => run((target) => target.undo())}>Deshacer</button>
+            <button type="button" className="map-tool" disabled={!doc.canRedo()} onClick={() => run((target) => target.redo())}>Rehacer</button>
+            {hasStage && (
+              <button type="button" className="map-tool map-tool--danger" onClick={() => run((target) => target.clearStage())}>
+                Borrar escenario
+              </button>
+            )}
+          </>
         )}
       </div>
 
+      {readOnly && (
+        <div className="map-banner map-banner--info" role="status">
+          Estás viendo un venue de otro owner: solo puedes explorar el mapa con zoom y arrastre (Alt/rueda).
+        </div>
+      )}
       {!hasStage && (
         <div className="map-banner map-banner--info" role="status">
           Empieza dibujando el escenario: arrastra un rectángulo con la herramienta «Escenario».
@@ -520,6 +533,7 @@ function SeatMapEditor({ venue, document: doc, savedVersion: initialVersion = 0,
           />
         </div>
 
+        {!readOnly && (
         <aside className="map-editor__panel" aria-label="Opciones de la herramienta">
           {tool === TOOLS.BLOCK ? (
             <>
@@ -619,6 +633,7 @@ function SeatMapEditor({ venue, document: doc, savedVersion: initialVersion = 0,
           )}
           <ProblemsPanel problems={problems} />
         </aside>
+        )}
       </div>
     </section>
   )
