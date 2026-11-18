@@ -1,3 +1,5 @@
+import { formatVenueLocation } from '../../../services/venueFormat.js'
+
 export default function EventEditForm({
   eventId,
   form,
@@ -132,7 +134,7 @@ export default function EventEditForm({
               {catalogue.venues.map((venue) => (
                 <option key={venue.id} value={venue.id}>
                   {venue.name}
-                  {venue.location ? ` · ${venue.location}` : ''}
+                  {formatVenueLocation(venue) ? ` · ${formatVenueLocation(venue)}` : ''}
                 </option>
               ))}
             </select>

@@ -1,3 +1,5 @@
+import { formatVenueLocation } from '../../../services/venueFormat.js'
+
 const STATUS_LABELS = {
   Scheduled: 'Programado',
   Draft: 'Borrador',
@@ -122,7 +124,7 @@ export default function EventDetailView({
           {venue ? (
             <div className="event-venue-info">
               <p className="event-venue-name">{venue.name}</p>
-              {venue.location && <p className="venue-location">{venue.location}</p>}
+              {formatVenueLocation(venue) && <p className="venue-location">{formatVenueLocation(venue)}</p>}
             </div>
           ) : venuesLoading ? (
             <p className="field-hint">Cargando datos del recinto…</p>

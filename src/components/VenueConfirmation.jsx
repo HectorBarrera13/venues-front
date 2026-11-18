@@ -1,6 +1,7 @@
 // src/components/VenueConfirmation.jsx
 //
 // Shown by VenueRegisterForm after a successful POST /venues.
+import { formatVenueLocation } from '../services/venueFormat.js'
 
 export function VenueConfirmation({ venue, onRegisterAnother }) {
   return (
@@ -15,7 +16,7 @@ export function VenueConfirmation({ venue, onRegisterAnother }) {
         <h1 id="confirmation-title">Recinto registrado correctamente</h1>
         {venue && (
           <p className="confirmation-copy">
-            <strong>{venue.name}</strong> quedó registrado en {venue.location}.
+            <strong>{venue.name}</strong> quedó registrado en {formatVenueLocation(venue)}.
           </p>
         )}
         <div className="form-actions form-actions--center">

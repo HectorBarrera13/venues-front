@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react'
 import LocationMapPicker from './LocationMapPicker.jsx'
+import { formatVenueLocation } from '../services/venueFormat.js'
 
 function VenueEditModal({ venue, isOpen, onClose, onSave }) {
   const [name, setName] = useState(venue?.name || '')
-  const [location, setLocation] = useState(venue?.location || '')
+  const [location, setLocation] = useState(formatVenueLocation(venue))
   const [description, setDescription] = useState(venue?.description || '')
   const [errors, setErrors] = useState({})
 
