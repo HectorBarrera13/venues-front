@@ -4,6 +4,8 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import MapCanvas from './MapCanvas.jsx'
+import venueApiClient, { ApiClientError } from '../../services/VenueApiClient.js'
+import { goToSignIn } from '../../auth/session.js'
 import { TOOLS, toolGate } from './tools.js'
 import { blockProblems, outlineForSeats, rectIsUsable, rectOutline, seatsInRect } from './geometry.js'
 import { computeBlockPositions, MapDocumentError } from './mapDocument.js'
@@ -140,12 +142,17 @@ function ProblemsPanel({ problems }) {
   )
 }
 
-function SeatMapEditor({ venue, document: doc, savedVersion = 0 }) {
+function SeatMapEditor({ venue, document: doc, savedVersion: initialVersion = 0, readOnly = false, onForbidden }) {
   const [revision, setRevision] = useState(0)
   const [tool, setTool] = useState(TOOLS.STAGE)
   const [draft, setDraft] = useState(null)
   const [notice, setNotice] = useState(null)
   const [view, setView] = useState(DEFAULT_VIEW)
+  const [saving, setSaving] = useState(false)
+  const [lastSavedVersion, setLastSavedVersion] = useState(initialVersion)
+  const [savedBanner, setSavedBanner] = useState(null)
+  const [serverIssues, setServerIssues] = useState([])
+  const savingRef = useRef(false)
   const [selectedSeatIds, setSelectedSeatIds] = useState(() => new Set())
   const [selectedZoneIds, setSelectedZoneIds] = useState(() => new Set())
   const [zoneName, setZoneName] = useState('')
@@ -379,9 +386,45 @@ function SeatMapEditor({ venue, document: doc, savedVersion = 0 }) {
 
   const highlightSeats = new Set(conflictSeatIds)
   const highlightZones = new Set()
-  for (const issue of problems) {
+  for (const issue of [...problems, ...serverIssues]) {
     for (const id of issue.seatIds ?? []) highlightSeats.add(id)
     for (const id of issue.zoneIds ?? []) highlightZones.add(id)
+  }
+
+  /**
+   * Save flow (VEN-508): serialize() → POST /venues/{id}/map. 201 shows the new
+   * immutable version; 422 highlights every seatId/zoneId named by the backend
+   * (the source of truth) and lists the codes; double submits are impossible.
+   */
+  async function handleSave() {
+    if (savingRef.current) return
+    savingRef.current = true
+    setSaving(true)
+    setSavedBanner(null)
+    setServerIssues([])
+    try {
+      const map = await venueApiClient.saveMap(venue.id, doc.serialize())
+      setLastSavedVersion(map.version)
+      setSavedBanner(`Versión ${map.version} guardada.`)
+    } catch (error) {
+      if (error instanceof ApiClientError && error.status === 422) {
+        setServerIssues(error.details?.errors ?? [])
+        setNotice('El servidor rechazó el mapa: revisa los elementos resaltados.')
+      } else if (error instanceof ApiClientError && error.status === 401) {
+        setNotice('Tu sesión expiró; vuelve a iniciar sesión para guardar.')
+        goToSignIn()
+      } else if (error instanceof ApiClientError && error.status === 403) {
+        setNotice('No eres el owner de este recinto: solo él puede guardar su mapa.')
+        onForbidden?.()
+      } else if (error instanceof ApiClientError && error.status === 404) {
+        setNotice('El recinto ya no existe; el mapa no se guardó.')
+      } else {
+        setNotice(error.message)
+      }
+    } finally {
+      setSaving(false)
+      savingRef.current = false
+    }
   }
 
   return (
@@ -392,7 +435,16 @@ function SeatMapEditor({ venue, document: doc, savedVersion = 0 }) {
           <h1>{venue?.name ?? 'Recinto'}</h1>
         </div>
         <span className="spacer" />
-        <span className="event-status">{savedVersion > 0 ? `v${savedVersion}` : 'sin mapa'}</span>
+        <span className="event-status">{lastSavedVersion > 0 ? `v${lastSavedVersion}` : 'sin mapa'}</span>
+        <button
+          type="button"
+          className="primary-button"
+          disabled={readOnly || saving || problems.length > 0}
+          title={problems.length > 0 ? 'Resuelve los problemas del panel antes de guardar' : undefined}
+          onClick={handleSave}
+        >
+          {saving ? 'Guardando…' : 'Guardar mapa'}
+        </button>
       </header>
 
       <div className="map-editor__toolbar" role="toolbar" aria-label="Herramientas del editor">
@@ -430,6 +482,19 @@ function SeatMapEditor({ venue, document: doc, savedVersion = 0 }) {
         </div>
       )}
       {notice && <div className="map-banner map-banner--error" role="alert">{notice}</div>}
+      {savedBanner && <div className="map-banner map-banner--success" role="status">{savedBanner}</div>}
+      {serverIssues.length > 0 && (
+        <div className="map-banner map-banner--error" role="alert">
+          <p style={{ margin: '0 0 6px' }}>El servidor (fuente de verdad) rechazó el guardado:</p>
+          <ul className="map-problems">
+            {serverIssues.map((issue, index) => (
+              <li key={`server-${index}-${issue.code}`}>
+                <span className="map-problems__code">{issue.code}</span> · {issue.message}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       <div className="map-editor__layout">
         <div className="map-editor__canvas-frame">

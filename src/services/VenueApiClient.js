@@ -203,6 +203,43 @@ class VenueApiClient {
   }
 
   /**
+   * Saves a seat map as a NEW immutable version. POST /venues/{id}/map.
+   *
+   * @param {string} venueId
+   * @param {object} payload MapDocument.serialize(): { stage, zones, seats }, 0–1 coordinates
+   * @param {{ signal?: AbortSignal }} [options]
+   * @returns {Promise<object>} the stored MapVersion ({ venueId, version, createdAt, … })
+   * @throws {ApiClientError} 400 malformed payload; 401 expired session; 403 not
+   *   the owner; 404 unknown venue; 422 validation failed — with the structured
+   *   list on `error.details.errors` ([{ code, message, seatIds?, zoneIds? }]).
+   */
+  async saveMap(venueId, payload, { signal } = {}) {
+    const token = getVenueToken()
+    let response
+    try {
+      response = await fetch(`${this.baseUrl}/venues/${encodeURIComponent(venueId)}/map`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify(payload),
+        signal,
+      })
+    } catch (error) {
+      if (error.name === 'AbortError') throw error
+      throw new Error('No fue posible conectar con el servidor.', { cause: error })
+    }
+    const body = await response.json().catch(() => null)
+    if (!response.ok) {
+      const message = body?.error || 'No pudimos guardar el mapa.'
+      throw new ApiClientError(message, response.status, null, body ?? undefined)
+    }
+    return body
+  }
+
+  /**
    * Registers a new venue.
    *
    * POSTs the venue's data to /venues with the access token as a Bearer

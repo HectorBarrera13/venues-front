@@ -24,6 +24,7 @@ function StatePanel({ title, description, action }) {
 function MapEditorPage({ venueId }) {
   const { currentUser } = useCurrentUser()
   const [state, setState] = useState({ status: 'loading', venueId })
+  const [editorForbidden, setEditorForbidden] = useState(false)
 
   useEffect(() => {
     const controller = new AbortController()
@@ -83,7 +84,8 @@ function MapEditorPage({ venueId }) {
       venue={state.venue}
       document={state.document}
       savedVersion={state.version}
-      readOnly={!isOwner}
+      readOnly={!isOwner || editorForbidden}
+      onForbidden={() => setEditorForbidden(true)}
     />
   )
 }

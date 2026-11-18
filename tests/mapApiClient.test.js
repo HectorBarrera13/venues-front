@@ -5,6 +5,7 @@ import { TOKEN_STORAGE_KEY } from '../src/auth/constants.js'
 import { server } from '../src/mocks/node.js'
 import { MOCK_OWNER_ID, OTHER_OWNER_ID, mockStore, resetMockStore } from '../src/mocks/store.js'
 import validV1 from '../src/mocks/fixtures/maps/valid-v1.json' with { type: 'json' }
+import duplicateLabel from '../src/mocks/fixtures/maps/duplicate-label.json' with { type: 'json' }
 import { ApiClientError, VenueApiClient } from '../src/services/VenueApiClient.js'
 
 const encode = (value) => Buffer.from(JSON.stringify(value)).toString('base64url')
@@ -69,4 +70,56 @@ test('the seeded other-owner venue keeps its identity for the read-only decision
   const foreign = mockStore.allVenues().find((venue) => venue.ownerId === OTHER_OWNER_ID)
   const venue = await client.getVenue(foreign.id)
   assert.notEqual(venue.ownerId, MOCK_OWNER_ID)
+})
+
+test('saveMap returns 201 with the stored version and increments it on the next save', async () => {
+  const created = ownVenue()
+  const first = await client.saveMap(created.id, structuredClone(validV1))
+  assert.equal(first.version, 1)
+  assert.equal(first.venueId, created.id)
+
+  const edited = {
+    ...structuredClone(validV1),
+    seats: validV1.seats.map((seat) => (seat.id === 's-floor-A-01' ? { ...seat, label: '101' } : seat)),
+  }
+  const second = await client.saveMap(created.id, edited)
+  assert.equal(second.version, 2)
+  const venue = await client.getVenue(created.id)
+  assert.equal(venue.latestMapVersion, 2)
+})
+
+test('saveMap 422 exposes the structured errors on details.errors', async () => {
+  const created = ownVenue()
+  await assert.rejects(client.saveMap(created.id, structuredClone(duplicateLabel)), (error) => {
+    assert.ok(error instanceof ApiClientError)
+    assert.equal(error.status, 422)
+    const [issue] = error.details.errors
+    assert.equal(issue.code, 'DUPLICATE_LABEL')
+    assert.deepEqual(issue.seatIds, ['s-floor-A-01', 's-floor-A-02'])
+    assert.deepEqual(issue.zoneIds, ['z-floor'])
+    return true
+  })
+})
+
+test('saveMap 403 when the venue belongs to another owner', async () => {
+  const foreign = mockStore.allVenues().find((venue) => venue.ownerId === OTHER_OWNER_ID)
+  await assert.rejects(client.saveMap(foreign.id, structuredClone(validV1)), (error) =>
+    error instanceof ApiClientError && error.status === 403)
+})
+
+test('saveMap 400 for a malformed payload and 404 for an unknown venue', async () => {
+  const created = ownVenue()
+  const broken = structuredClone(validV1)
+  broken.seats[0].position.x = 1.2
+  await assert.rejects(client.saveMap(created.id, broken), (error) => error.status === 400)
+  await assert.rejects(client.saveMap('no-existe', structuredClone(validV1)), (error) => error.status === 404)
+})
+
+test('a serialized MapDocument round-trips through the API unchanged', async () => {
+  const { loadMapDocument } = await import('../src/domains/mapeditor/mapDocument.js')
+  const doc = loadMapDocument(structuredClone(validV1))
+  const created = ownVenue()
+  const stored = await client.saveMap(created.id, doc.serialize())
+  const reloaded = loadMapDocument(stored)
+  assert.deepEqual(reloaded.serialize(), doc.serialize())
 })
