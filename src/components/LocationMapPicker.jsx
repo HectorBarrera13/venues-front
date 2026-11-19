@@ -6,9 +6,15 @@
 // directions: reverse geocoding (map click -> address) and forward
 // geocoding (typed search -> candidates, so someone who doesn't
 // recognize the map visually can search instead and still see the pin
-// land on the right spot). The venue's `location` is still just a
-// string on the way out — the backend and Venue entity never see
-// coordinates — so nothing else in the app needs to change.
+// land on the right spot).
+//
+// Two outputs (VEN-401):
+// - `onChange(label)` keeps emitting the human-readable string, so the
+//   existing forms keep working unchanged.
+// - `onPlaceChange(place)` (optional) emits the structured geography the
+//   venue-service contract needs: { lat, lng, name, address, city, country,
+//   externalId, externalSource, osmRef, displayName } — see
+//   services/nominatimPlace.js. Fields Nominatim doesn't return are null.
 //
 // The text field under the map is read-only: it only ever reflects what
 // the map/search picked, so it works as a plain confirmation of the
@@ -28,6 +34,10 @@ import "leaflet/dist/leaflet.css";
 import markerIcon2x from "leaflet/dist/images/marker-icon-2x.png";
 import markerIcon from "leaflet/dist/images/marker-icon.png";
 import markerShadow from "leaflet/dist/images/marker-shadow.png";
+import {
+  coordinatesOnlyPlace,
+  toVenuePlace,
+} from "../services/nominatimPlace.js";
 
 // Vite doesn't resolve Leaflet's default marker image paths on its own;
 // point them at the bundled asset URLs once for the whole app.
@@ -44,7 +54,7 @@ const SEARCH_DEBOUNCE_MS = 450;
 const MIN_SEARCH_LENGTH = 3;
 
 async function reverseGeocode(lat, lng) {
-  const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}&zoom=18&addressdetails=0`;
+  const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`;
   const response = await fetch(url, {
     headers: { Accept: "application/json" },
   });
@@ -55,11 +65,13 @@ async function reverseGeocode(lat, lng) {
   const payload = await response.json().catch(() => null);
   if (!payload?.display_name)
     throw new Error("Ese punto no tiene una dirección conocida.");
-  return payload.display_name;
+  // Keep the clicked point: it is what the person chose, Nominatim's lat/lon
+  // is the centroid of whatever OSM object it snapped to.
+  return { ...toVenuePlace(payload), lat, lng };
 }
 
 async function searchAddress(query) {
-  const url = `https://nominatim.openstreetmap.org/search?format=jsonv2&q=${encodeURIComponent(query)}&addressdetails=0&limit=5`;
+  const url = `https://nominatim.openstreetmap.org/search?format=jsonv2&q=${encodeURIComponent(query)}&addressdetails=1&limit=5`;
   const response = await fetch(url, {
     headers: { Accept: "application/json" },
   });
@@ -72,6 +84,7 @@ async function searchAddress(query) {
     label: item.display_name,
     lat: Number(item.lat),
     lng: Number(item.lon),
+    place: toVenuePlace(item),
   }));
 }
 
@@ -154,9 +167,10 @@ function InvalidateMapSize() {
  *   id?: string,
  *   value: string,
  *   onChange: (address: string) => void,
+ *   onPlaceChange?: (place: import("../services/nominatimPlace.js").VenuePlace) => void,
  * }} props
  */
-function LocationMapPicker({ id, value, onChange }) {
+function LocationMapPicker({ id, value, onChange, onPlaceChange }) {
   const [position, setPosition] = useState(null);
   const [flyTarget, setFlyTarget] = useState(null);
   const [scrollZoomEnabled, setScrollZoomEnabled] = useState(false);
@@ -212,13 +226,16 @@ function LocationMapPicker({ id, value, onChange }) {
   }, [value]);
 
   const pickPoint = useCallback(
-    (lat, lng, label) => {
+    (lat, lng, label, place) => {
       setPosition([lat, lng]);
       setFlyTarget({ center: [lat, lng], zoom: 16 });
 
       if (label) {
+        // Invalidate any reverse lookup still in flight from an earlier click.
+        pickRequestIdRef.current += 1;
         setStatus("idle");
         onChange(label);
+        onPlaceChange?.(place ?? coordinatesOnlyPlace(lat, lng));
         return;
       }
 
@@ -227,10 +244,11 @@ function LocationMapPicker({ id, value, onChange }) {
       const requestId = (pickRequestIdRef.current += 1);
 
       reverseGeocode(lat, lng)
-        .then((address) => {
+        .then((resolved) => {
           if (pickRequestIdRef.current !== requestId) return; // a newer pick superseded this one
           setStatus("idle");
-          onChange(address);
+          onChange(resolved.displayName);
+          onPlaceChange?.(resolved);
         })
         .catch((error) => {
           if (pickRequestIdRef.current !== requestId) return;
@@ -240,9 +258,10 @@ function LocationMapPicker({ id, value, onChange }) {
           // confirms a point was picked — fall back to the raw coordinates
           // when Nominatim can't turn them into a readable address.
           onChange(`${lat.toFixed(5)}, ${lng.toFixed(5)}`);
+          onPlaceChange?.(coordinatesOnlyPlace(lat, lng));
         });
     },
-    [onChange],
+    [onChange, onPlaceChange],
   );
 
   function handleSearchChange(event) {
@@ -279,7 +298,7 @@ function LocationMapPicker({ id, value, onChange }) {
     setQuery("");
     setSuggestions([]);
     setSearchStatus("idle");
-    pickPoint(suggestion.lat, suggestion.lng, suggestion.label);
+    pickPoint(suggestion.lat, suggestion.lng, suggestion.label, suggestion.place);
   }
 
   return (
