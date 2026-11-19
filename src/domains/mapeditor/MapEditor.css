@@ -1,0 +1,127 @@
+/* Seat map editor (P5). Colours follow the Backstage palette in App.css. */
+
+.map-editor {
+  display: grid;
+  gap: 16px;
+  padding: 24px 0 48px;
+}
+
+.map-editor__header { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+.map-editor__header h1 { margin: 0; font-size: 24px; color: #071d49; letter-spacing: -0.03em; }
+.map-editor__header .eyebrow { margin: 0; }
+.map-editor__header .spacer { flex: 1; }
+
+.map-editor__layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 300px;
+  gap: 16px;
+  align-items: start;
+}
+
+@media (max-width: 900px) {
+  .map-editor__layout { grid-template-columns: minmax(0, 1fr); }
+}
+
+.map-editor__toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  padding: 10px 12px;
+  background: #fff;
+  border: 1px solid #cbd8e8;
+  border-radius: 10px;
+}
+
+.map-tool {
+  padding: 8px 14px;
+  border: 1px solid #cbd8e8;
+  border-radius: 8px;
+  background: #f4f8fd;
+  color: #1c2a44;
+  font: inherit;
+  cursor: pointer;
+}
+.map-tool:hover:not(:disabled) { background: #e4effb; }
+.map-tool[aria-pressed="true"] { background: #026cdf; border-color: #026cdf; color: #fff; }
+.map-tool:disabled { opacity: 0.45; cursor: not-allowed; }
+.map-tool--danger { color: #bc2942; }
+
+.map-editor__canvas-frame {
+  position: relative;
+  background: #fff;
+  border: 1px solid #cbd8e8;
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.map-canvas { display: block; width: 100%; height: min(70vh, 92vw); touch-action: none; cursor: crosshair; }
+.map-canvas__paper { fill: #eef3fa; }
+.map-canvas__field { fill: #ffffff; stroke: #9fb4d0; stroke-dasharray: 8 6; stroke-width: 2; vector-effect: non-scaling-stroke; }
+.map-canvas__hint { fill: #65738a; font-size: 22px; }
+
+.map-stage {
+  fill: rgba(7, 29, 73, 0.85);
+  stroke: #071d49;
+  stroke-width: 2;
+  vector-effect: non-scaling-stroke;
+}
+
+.map-zone {
+  fill: rgba(2, 108, 223, 0.07);
+  stroke: #026cdf;
+  stroke-width: 1.5;
+  stroke-dasharray: 6 4;
+  vector-effect: non-scaling-stroke;
+  cursor: pointer;
+}
+.map-zone--selected { stroke-width: 3; stroke-dasharray: none; fill: rgba(2, 108, 223, 0.12); }
+.map-zone--error { stroke: #bc2942; fill: rgba(188, 41, 66, 0.08); }
+.map-zone__vertex { fill: #fff; stroke: #026cdf; stroke-width: 1.5; cursor: grab; vector-effect: non-scaling-stroke; }
+
+.map-seat__dot { fill: #45516b; stroke: #1c2a44; stroke-width: 1; vector-effect: non-scaling-stroke; cursor: pointer; }
+.map-seat__label { fill: #1c2a44; font-size: 18px; }
+.map-seat--selected .map-seat__dot { fill: #1769ff; stroke: #053d8f; }
+.map-seat--error .map-seat__dot { fill: #bc2942; stroke: #7c0f24; }
+.map-seat--ghost { fill: rgba(23, 105, 255, 0.35); stroke: none; }
+.map-seat--ghost-invalid { fill: rgba(188, 41, 66, 0.45); }
+
+.map-draft { fill: rgba(2, 108, 223, 0.08); stroke: #026cdf; stroke-dasharray: 4 4; stroke-width: 1.5; vector-effect: non-scaling-stroke; }
+
+.map-editor__panel {
+  display: grid;
+  gap: 14px;
+  align-content: start;
+  padding: 16px;
+  background: #fff;
+  border: 1px solid #cbd8e8;
+  border-radius: 10px;
+}
+.map-editor__panel h2 { margin: 0; font-size: 15px; color: #071d49; }
+.map-editor__panel label { display: grid; gap: 4px; font-size: 13px; color: #45516b; }
+.map-editor__panel input, .map-editor__panel select {
+  padding: 8px;
+  border: 1px solid #cbd8e8;
+  border-radius: 6px;
+  font: inherit;
+}
+.map-editor__panel .row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.map-editor__panel .hint { margin: 0; font-size: 12px; color: #65738a; line-height: 1.5; }
+
+.map-problems { margin: 0; padding: 0; list-style: none; display: grid; gap: 6px; }
+.map-problems li {
+  padding: 8px 10px;
+  border-radius: 6px;
+  font-size: 13px;
+  background: #fdeef1;
+  color: #7c0f24;
+  border: 1px solid #f3c2cc;
+}
+.map-problems__code { font-weight: 700; letter-spacing: 0.02em; }
+.map-problems--ok { font-size: 13px; color: #157347; }
+
+.map-editor__banners { display: grid; gap: 8px; }
+.map-banner { padding: 10px 14px; border-radius: 8px; font-size: 14px; }
+.map-banner--success { background: #e5f4ea; color: #145c33; border: 1px solid #b7dfc6; }
+.map-banner--error { background: #fdeef1; color: #7c0f24; border: 1px solid #f3c2cc; }
+.map-banner--info { background: #eaf2fd; color: #0a3f7f; border: 1px solid #c2d9f5; }
