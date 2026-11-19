@@ -69,10 +69,33 @@ export function countryOptions(locale = 'es') {
  * replaced by the new place (they belong to the previously picked point); the
  * name is only prefilled while the person hasn't typed one of their own.
  *
+ * `null` (the map service failed for the clicked point, VEN-406) clears the
+ * place: the form has no point and can't be submitted until a retry works.
+ * A name the person typed is kept either way.
+ *
  * @param {typeof initialVenueForm} form
- * @param {import('./nominatimPlace.js').VenuePlace} place
+ * @param {import('./nominatimPlace.js').VenuePlace | null} place
  */
 export function applyPlaceToForm(form, place) {
+  if (!place) {
+    const nameIsOwn = filled(form.name) && form.name !== form.autofilledName
+    return {
+      ...form,
+      address: '',
+      city: '',
+      country: '',
+      lat: null,
+      lng: null,
+      externalId: null,
+      externalSource: null,
+      osmRef: null,
+      manualFields: [],
+      revealedFields: [],
+      name: nameIsOwn ? form.name : '',
+      autofilledName: nameIsOwn ? form.autofilledName : '',
+    }
+  }
+
   const address = place?.address ?? ''
   const city = place?.city ?? ''
   const country = isIsoCountryCode(place?.country ?? '') ? place.country.toUpperCase() : ''

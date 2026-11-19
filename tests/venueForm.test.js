@@ -142,3 +142,15 @@ test('a rejected prefilled place field becomes a visible input', () => {
   assert.equal(revealRejectedPlaceFields(revealed, { country: 'bad' }), revealed) // no-op when already visible
   assert.deepEqual(applyPlaceToForm(revealed, completePlace).revealedFields, []) // a new pick starts over
 })
+
+test('a failed map lookup (null place) clears the point but keeps a typed name', () => {
+  const picked = { ...applyPlaceToForm(initialVenueForm, completePlace), name: 'Mi foro' }
+  const cleared = applyPlaceToForm(picked, null)
+  assert.equal(cleared.lat, null)
+  assert.equal(cleared.osmRef, null)
+  assert.equal(cleared.city, '')
+  assert.deepEqual(cleared.manualFields, []) // no manual inputs for a point that doesn't exist
+  assert.equal(cleared.name, 'Mi foro')
+  assert.equal(validateVenueForm({ ...cleared, description: 'x' }).location, 'Marca la ubicación en el mapa o búscala.')
+  assert.equal(applyPlaceToForm(applyPlaceToForm(initialVenueForm, completePlace), null).name, '') // autofilled name goes too
+})

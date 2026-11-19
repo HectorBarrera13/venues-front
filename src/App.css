@@ -1014,6 +1014,18 @@
   color: #0272e5;
   font-size: 0.78rem;
 }
+/* Map service failure with a retry button (VEN-406). */
+.location-picker-retry {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+.location-picker-retry .secondary-button {
+  min-height: 34px;
+  padding: 0 14px;
+  font-size: 0.78rem;
+}
 .location-picker-address {
   width: 100%;
   border: 1px solid #cbd8e8;

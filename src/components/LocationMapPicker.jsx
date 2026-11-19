@@ -1,4 +1,4 @@
-// src/features/venues/components/LocationMapPicker.jsx
+// src/components/LocationMapPicker.jsx
 //
 // Task 9: lets the person pick the venue's location by clicking on a map
 // instead of typing it as free text. Uses Leaflet + OpenStreetMap tiles
@@ -15,6 +15,13 @@
 //   venue-service contract needs: { lat, lng, name, address, city, country,
 //   externalId, externalSource, osmRef, displayName } — see
 //   services/nominatimPlace.js. Fields Nominatim doesn't return are null.
+//   It emits `null` when a clicked point couldn't be resolved because the
+//   map service failed, so the form has no point to submit.
+//
+// Provider failures (VEN-406) stay inside the picker: no results says so,
+// a network/5xx failure shows a retry button, and none of it ever calls the
+// venue-service. Searches are debounced and every new one aborts the
+// previous request (services/placeSearch.js).
 //
 // The text field under the map is read-only: it only ever reflects what
 // the map/search picked, so it works as a plain confirmation of the
@@ -34,10 +41,9 @@ import "leaflet/dist/leaflet.css";
 import markerIcon2x from "leaflet/dist/images/marker-icon-2x.png";
 import markerIcon from "leaflet/dist/images/marker-icon.png";
 import markerShadow from "leaflet/dist/images/marker-shadow.png";
-import {
-  coordinatesOnlyPlace,
-  toVenuePlace,
-} from "../services/nominatimPlace.js";
+import { coordinatesOnlyPlace } from "../services/nominatimPlace.js";
+import { reversePlace, searchPlaces } from "../services/nominatimClient.js";
+import { createPlaceSearch } from "../services/placeSearch.js";
 
 // Vite doesn't resolve Leaflet's default marker image paths on its own;
 // point them at the bundled asset URLs once for the whole app.
@@ -50,43 +56,6 @@ L.Icon.Default.mergeOptions({
 
 const DEFAULT_CENTER = [20.9674, -89.5926]; // Mérida, Yucatán
 const DEFAULT_ZOOM = 13;
-const SEARCH_DEBOUNCE_MS = 450;
-const MIN_SEARCH_LENGTH = 3;
-
-async function reverseGeocode(lat, lng) {
-  const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`;
-  const response = await fetch(url, {
-    headers: { Accept: "application/json" },
-  });
-
-  if (!response.ok)
-    throw new Error("No pudimos obtener la dirección de ese punto.");
-
-  const payload = await response.json().catch(() => null);
-  if (!payload?.display_name)
-    throw new Error("Ese punto no tiene una dirección conocida.");
-  // Keep the clicked point: it is what the person chose, Nominatim's lat/lon
-  // is the centroid of whatever OSM object it snapped to.
-  return { ...toVenuePlace(payload), lat, lng };
-}
-
-async function searchAddress(query) {
-  const url = `https://nominatim.openstreetmap.org/search?format=jsonv2&q=${encodeURIComponent(query)}&addressdetails=1&limit=5`;
-  const response = await fetch(url, {
-    headers: { Accept: "application/json" },
-  });
-
-  if (!response.ok) throw new Error("No pudimos buscar esa dirección.");
-
-  const payload = await response.json().catch(() => []);
-  return (Array.isArray(payload) ? payload : []).map((item) => ({
-    id: item.place_id,
-    label: item.display_name,
-    lat: Number(item.lat),
-    lng: Number(item.lon),
-    place: toVenuePlace(item),
-  }));
-}
 
 function ClickToPick({ onPick }) {
   useMapEvents({
@@ -167,25 +136,33 @@ function InvalidateMapSize() {
  *   id?: string,
  *   value: string,
  *   onChange: (address: string) => void,
- *   onPlaceChange?: (place: import("../services/nominatimPlace.js").VenuePlace) => void,
+ *   onPlaceChange?: (place: import("../services/nominatimPlace.js").VenuePlace | null) => void,
  * }} props
  */
 function LocationMapPicker({ id, value, onChange, onPlaceChange }) {
   const [position, setPosition] = useState(null);
   const [flyTarget, setFlyTarget] = useState(null);
   const [scrollZoomEnabled, setScrollZoomEnabled] = useState(false);
-  const [status, setStatus] = useState("idle"); // idle | loading | error
-  const [statusMessage, setStatusMessage] = useState("");
-  const pickRequestIdRef = useRef(0);
+  // idle | loading | no-address | error
+  const [pickStatus, setPickStatus] = useState("idle");
+  const [failedPoint, setFailedPoint] = useState(null);
+  const pickControllerRef = useRef(null);
 
   const [query, setQuery] = useState("");
-  const [suggestions, setSuggestions] = useState([]);
-  const [searchStatus, setSearchStatus] = useState("idle"); // idle | loading | empty | error
-  const searchRequestIdRef = useRef(0);
-  const searchDebounceRef = useRef(null);
+  // { status: idle | loading | results | empty | error, results }
+  const [search, setSearch] = useState({ status: "idle", results: [] });
+  const searchRef = useRef(null);
 
   useEffect(() => {
-    return () => clearTimeout(searchDebounceRef.current);
+    const placeSearch = createPlaceSearch({
+      search: (text, { signal }) => searchPlaces(text, { signal }),
+      onChange: ({ status, results }) => setSearch({ status, results }),
+    });
+    searchRef.current = placeSearch;
+    return () => {
+      placeSearch.cancel();
+      pickControllerRef.current?.abort();
+    };
   }, []);
 
   // When an initial value is provided (e.g. editing an existing venue),
@@ -211,7 +188,8 @@ function LocationMapPicker({ id, value, onChange, onPlaceChange }) {
       };
     }
 
-    searchAddress(trimmed)
+    const controller = new AbortController();
+    searchPlaces(trimmed, { signal: controller.signal })
       .then((results) => {
         if (isCancelled || !results?.length) return;
         const first = results[0];
@@ -222,8 +200,46 @@ function LocationMapPicker({ id, value, onChange, onPlaceChange }) {
 
     return () => {
       isCancelled = true;
+      controller.abort();
     };
   }, [value]);
+
+  const resolvePoint = useCallback(
+    (lat, lng) => {
+      pickControllerRef.current?.abort(); // a newer click supersedes the previous lookup
+      const controller = new AbortController();
+      pickControllerRef.current = controller;
+      setPickStatus("loading");
+      setFailedPoint(null);
+
+      reversePlace(lat, lng, { signal: controller.signal })
+        .then((place) => {
+          if (pickControllerRef.current !== controller) return;
+          pickControllerRef.current = null;
+          if (place) {
+            setPickStatus("idle");
+            onChange(place.displayName);
+            onPlaceChange?.(place);
+            return;
+          }
+          // A real point with no known address: keep the coordinates and let
+          // the form ask for the address fields (VEN-402).
+          setPickStatus("no-address");
+          onChange(`${lat.toFixed(5)}, ${lng.toFixed(5)}`);
+          onPlaceChange?.(coordinatesOnlyPlace(lat, lng));
+        })
+        .catch((error) => {
+          if (error?.name === "AbortError" || pickControllerRef.current !== controller) return;
+          pickControllerRef.current = null;
+          // The map service failed: there is no usable place until a retry works.
+          setPickStatus("error");
+          setFailedPoint({ lat, lng });
+          onChange("");
+          onPlaceChange?.(null);
+        });
+    },
+    [onChange, onPlaceChange],
+  );
 
   const pickPoint = useCallback(
     (lat, lng, label, place) => {
@@ -231,75 +247,32 @@ function LocationMapPicker({ id, value, onChange, onPlaceChange }) {
       setFlyTarget({ center: [lat, lng], zoom: 16 });
 
       if (label) {
-        // Invalidate any reverse lookup still in flight from an earlier click.
-        pickRequestIdRef.current += 1;
-        setStatus("idle");
+        pickControllerRef.current?.abort();
+        pickControllerRef.current = null;
+        setPickStatus("idle");
+        setFailedPoint(null);
         onChange(label);
         onPlaceChange?.(place ?? coordinatesOnlyPlace(lat, lng));
         return;
       }
-
-      setStatus("loading");
-      setStatusMessage("");
-      const requestId = (pickRequestIdRef.current += 1);
-
-      reverseGeocode(lat, lng)
-        .then((resolved) => {
-          if (pickRequestIdRef.current !== requestId) return; // a newer pick superseded this one
-          setStatus("idle");
-          onChange(resolved.displayName);
-          onPlaceChange?.(resolved);
-        })
-        .catch((error) => {
-          if (pickRequestIdRef.current !== requestId) return;
-          setStatus("error");
-          setStatusMessage(error.message);
-          // The field is read-only now, so it still needs *something* that
-          // confirms a point was picked — fall back to the raw coordinates
-          // when Nominatim can't turn them into a readable address.
-          onChange(`${lat.toFixed(5)}, ${lng.toFixed(5)}`);
-          onPlaceChange?.(coordinatesOnlyPlace(lat, lng));
-        });
+      resolvePoint(lat, lng);
     },
-    [onChange, onPlaceChange],
+    [onChange, onPlaceChange, resolvePoint],
   );
 
   function handleSearchChange(event) {
-    const nextQuery = event.target.value;
-    setQuery(nextQuery);
-    clearTimeout(searchDebounceRef.current);
-
-    const trimmed = nextQuery.trim();
-    if (trimmed.length < MIN_SEARCH_LENGTH) {
-      setSuggestions([]);
-      setSearchStatus("idle");
-      return;
-    }
-
-    setSearchStatus("loading");
-    searchDebounceRef.current = setTimeout(() => {
-      const requestId = (searchRequestIdRef.current += 1);
-      searchAddress(trimmed)
-        .then((results) => {
-          if (searchRequestIdRef.current !== requestId) return; // a newer search superseded this one
-          setSuggestions(results);
-          setSearchStatus(results.length ? "idle" : "empty");
-        })
-        .catch(() => {
-          if (searchRequestIdRef.current !== requestId) return;
-          setSuggestions([]);
-          setSearchStatus("error");
-        });
-    }, SEARCH_DEBOUNCE_MS);
+    setQuery(event.target.value);
+    searchRef.current?.setQuery(event.target.value);
   }
 
   function handleSelectSuggestion(suggestion) {
-    clearTimeout(searchDebounceRef.current);
+    searchRef.current?.cancel();
     setQuery("");
-    setSuggestions([]);
-    setSearchStatus("idle");
+    setSearch({ status: "idle", results: [] });
     pickPoint(suggestion.lat, suggestion.lng, suggestion.label, suggestion.place);
   }
+
+  const suggestions = search.status === "results" ? search.results : [];
 
   return (
     <div className="location-picker">
@@ -354,18 +327,28 @@ function LocationMapPicker({ id, value, onChange, onPlaceChange }) {
             ))}
           </ul>
         )}
-        {searchStatus === "loading" && (
+        {search.status === "loading" && (
           <p className="location-picker-status">Buscando direcciones…</p>
         )}
-        {searchStatus === "empty" && (
-          <p className="location-picker-status">
-            Sin resultados para esa búsqueda.
+        {search.status === "empty" && (
+          <p className="location-picker-status" role="status">
+            No encontramos ese lugar. Prueba con otra búsqueda o márcalo
+            directamente en el mapa.
           </p>
         )}
-        {searchStatus === "error" && (
-          <p className="location-picker-status">
-            No pudimos buscar esa dirección.
-          </p>
+        {search.status === "error" && (
+          <div className="location-picker-retry" role="alert">
+            <p className="form-error">
+              No pudimos conectar con el servicio de mapas.
+            </p>
+            <button
+              type="button"
+              className="secondary-button"
+              onClick={() => searchRef.current?.retry()}
+            >
+              Reintentar búsqueda
+            </button>
+          </div>
         )}
       </div>
 
@@ -397,16 +380,31 @@ function LocationMapPicker({ id, value, onChange, onPlaceChange }) {
         marcarla.
       </p>
 
-      {status === "loading" && (
+      {pickStatus === "loading" && (
         <p className="location-picker-status">
           Obteniendo la dirección de ese punto…
         </p>
       )}
-      {status === "error" && (
-        <p className="form-error" role="alert">
-          {statusMessage} Se muestran las coordenadas mientras tanto — intenta
-          buscar o marcar de nuevo.
+      {pickStatus === "no-address" && (
+        <p className="location-picker-status" role="status">
+          No encontramos una dirección para ese punto. Se muestran sus
+          coordenadas: completa los datos que falten o marca otro punto.
         </p>
+      )}
+      {pickStatus === "error" && failedPoint && (
+        <div className="location-picker-retry" role="alert">
+          <p className="form-error">
+            No pudimos obtener la dirección de ese punto porque el servicio de
+            mapas no respondió.
+          </p>
+          <button
+            type="button"
+            className="secondary-button"
+            onClick={() => resolvePoint(failedPoint.lat, failedPoint.lng)}
+          >
+            Reintentar
+          </button>
+        </div>
       )}
 
       <input
