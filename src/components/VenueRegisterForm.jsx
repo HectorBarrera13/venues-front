@@ -4,8 +4,10 @@
 // country; whatever the map couldn't provide is asked for with its own input
 // and is required before submitting (VEN-402). Validation runs on the client
 // before any request. Statuses the backend answers with get their own
-// treatment — 201 replaces the form with VenueConfirmation, a 400 lands on the
-// input it rejected, a 401 goes to sign-in and a 403 says no. A 409 is not
+// treatment — 201 replaces the form with VenueConfirmation, a 400 lands on
+// every input it rejected (VEN-405; a prefilled place field that was hidden is
+// shown so its error has a place), a 401 goes to sign-in and a 403 says no.
+// A 400 about a field the form doesn't know falls back to the summary. A 409 is not
 // treated as an error (VEN-404): the place is already registered, so the form
 // keeps its data and offers to open the existing venue instead.
 
@@ -13,10 +15,13 @@ import { useMemo, useState } from "react";
 import { useCreateVenue } from "../hooks/useCreateVenue";
 import { ApiClientError } from "../services/VenueApiClient.js";
 import {
+  apiFieldErrorMessage,
   applyPlaceToForm,
   countryOptions,
   initialVenueForm,
+  revealRejectedPlaceFields,
   validateVenueForm,
+  visiblePlaceFields,
 } from "../services/venueForm.js";
 import { venuePath } from "../services/venueFormat.js";
 import LocationMapPicker from "./LocationMapPicker.jsx";
@@ -33,6 +38,8 @@ export function VenueRegisterForm() {
 
   const apiErrorStatus = error instanceof ApiClientError ? error.status : null;
   const isDuplicate = apiErrorStatus === 409;
+  const apiFieldErrors =
+    apiErrorStatus === 400 ? Object.keys(error.fieldErrors ?? {}) : [];
 
   function errorFor(field) {
     return fieldErrors[field];
@@ -73,11 +80,24 @@ export function VenueRegisterForm() {
       return;
     }
 
-    const createdVenue = await createVenue(form);
+    const createdVenue = await createVenue(form, { onError: showApiFieldErrors });
     if (createdVenue) {
       setForm(initialVenueForm);
       setFieldErrors({});
     }
+  }
+
+  function showApiFieldErrors(requestError) {
+    if (!(requestError instanceof ApiClientError) || requestError.status !== 400) return;
+    const rejected = Object.entries(requestError.fieldErrors ?? {});
+    if (rejected.length === 0) return; // unknown field: the summary explains it
+
+    setFieldErrors(
+      Object.fromEntries(
+        rejected.map(([field, message]) => [field, apiFieldErrorMessage(field, message)]),
+      ),
+    );
+    setForm((prev) => revealRejectedPlaceFields(prev, requestError.fieldErrors));
   }
 
   function handleRegisterAnother() {
@@ -107,7 +127,7 @@ export function VenueRegisterForm() {
     };
   }
 
-  const manualFields = form.manualFields;
+  const manualFields = visiblePlaceFields(form);
 
   if (isSuccess) {
     return (
@@ -153,7 +173,7 @@ export function VenueRegisterForm() {
             {renderError("location")}
           </div>
 
-          {manualFields.length > 0 && (
+          {form.manualFields.length > 0 && (
             <p
               className="location-picker-status form-field--full"
               role="status"
@@ -231,7 +251,12 @@ export function VenueRegisterForm() {
 
         {isError && !isDuplicate && (
           <p className="form-error form-error--summary" role="alert">
-            {apiErrorStatus === 400 ? (
+            {apiErrorStatus === 400 && apiFieldErrors.length > 0 ? (
+              <>
+                <strong>Revisa los datos del recinto.</strong> Corrige los
+                campos marcados y vuelve a intentarlo.
+              </>
+            ) : apiErrorStatus === 400 ? (
               <>
                 <strong>Revisa los datos del recinto.</strong> {error.message}
               </>

@@ -25,6 +25,7 @@ export const initialVenueForm = Object.freeze({
   externalSource: null,
   osmRef: null,
   manualFields: [], // which of MANUAL_PLACE_FIELDS the picker left empty
+  revealedFields: [], // prefilled place fields shown because the backend rejected them
   autofilledName: '', // last name taken from the map, to know if it was edited
 })
 
@@ -88,9 +89,74 @@ export function applyPlaceToForm(form, place) {
     externalSource: place?.externalSource ?? null,
     osmRef: place?.osmRef ?? null,
     manualFields: MANUAL_PLACE_FIELDS.filter((field) => !filled(values[field])),
+    revealedFields: [],
     name: nameIsOwn ? form.name : placeName,
     autofilledName: nameIsOwn ? form.autofilledName : placeName,
   }
+}
+
+// One wording per field and kind of problem, shared by the client-side
+// validation and the 400s of the backend (VEN-405), whose messages are English.
+const REQUIRED_MESSAGES = Object.freeze({
+  name: 'El nombre es obligatorio.',
+  description: 'La descripción es obligatoria.',
+  address: 'La dirección es obligatoria.',
+  city: 'La ciudad es obligatoria.',
+  country: 'El país es obligatorio.',
+  location: 'Marca la ubicación en el mapa o búscala.',
+})
+const INVALID_MESSAGES = Object.freeze({
+  name: 'Revisa el nombre del recinto.',
+  description: 'Revisa la descripción.',
+  address: 'Revisa la dirección.',
+  city: 'Revisa la ciudad.',
+  country: 'Elige un país válido (código ISO de 2 letras, p. ej. MX).',
+  location: 'No pudimos usar ese punto del mapa. Búscalo o márcalo de nuevo.',
+})
+const FIELD_LABELS = Object.freeze({
+  name: 'El nombre',
+  description: 'La descripción',
+  address: 'La dirección',
+  city: 'La ciudad',
+})
+
+/**
+ * Spanish message for a field the backend rejected with a 400.
+ *
+ * @param {string} field One of the form fields (name, description, address, city, country, location).
+ * @param {string} [backendMessage] e.g. 'Field "city" is required'.
+ * @returns {string}
+ */
+export function apiFieldErrorMessage(field, backendMessage = '') {
+  const message = String(backendMessage)
+  if (/\brequired\b|obligatori/i.test(message) && REQUIRED_MESSAGES[field]) return REQUIRED_MESSAGES[field]
+  const maxLength = message.match(/at most (\d+) characters/i)
+  if (maxLength && FIELD_LABELS[field]) return `${FIELD_LABELS[field]} admite como máximo ${maxLength[1]} caracteres.`
+  return INVALID_MESSAGES[field] ?? 'Revisa este campo.'
+}
+
+/**
+ * Applies the field errors of a 400 (`ApiClientError.fieldErrors`) to the
+ * form: place fields that were prefilled and hidden become visible inputs so
+ * the error has somewhere to land.
+ *
+ * @param {typeof initialVenueForm} form
+ * @param {Record<string, string>} fieldErrors
+ */
+export function revealRejectedPlaceFields(form, fieldErrors) {
+  const hidden = MANUAL_PLACE_FIELDS.filter(
+    (field) => fieldErrors?.[field] && !form.manualFields.includes(field) && !form.revealedFields.includes(field),
+  )
+  if (hidden.length === 0) return form
+  return {
+    ...form,
+    revealedFields: MANUAL_PLACE_FIELDS.filter((field) => form.revealedFields.includes(field) || hidden.includes(field)),
+  }
+}
+
+/** Place inputs the form shows: missing from the map, or rejected by the backend. */
+export function visiblePlaceFields(form) {
+  return MANUAL_PLACE_FIELDS.filter((field) => form.manualFields.includes(field) || form.revealedFields.includes(field))
 }
 
 /**
@@ -101,20 +167,18 @@ export function applyPlaceToForm(form, place) {
  */
 export function validateVenueForm(form) {
   const errors = {}
-  if (!filled(form.name)) errors.name = 'El nombre es obligatorio.'
-  if (!filled(form.description)) errors.description = 'La descripción es obligatoria.'
+  if (!filled(form.name)) errors.name = REQUIRED_MESSAGES.name
+  if (!filled(form.description)) errors.description = REQUIRED_MESSAGES.description
 
   const hasPoint = Number.isFinite(form.lat) && Number.isFinite(form.lng)
   if (!hasPoint) {
-    errors.location = 'Marca la ubicación en el mapa o búscala.'
+    errors.location = REQUIRED_MESSAGES.location
     return errors // the place fields only make sense once a point is picked
   }
 
-  if (!filled(form.address)) errors.address = 'La dirección es obligatoria.'
-  if (!filled(form.city)) errors.city = 'La ciudad es obligatoria.'
-  if (!filled(form.country)) errors.country = 'El país es obligatorio.'
-  else if (!isIsoCountryCode(form.country)) {
-    errors.country = 'Elige un país válido (código ISO de 2 letras, p. ej. MX).'
-  }
+  if (!filled(form.address)) errors.address = REQUIRED_MESSAGES.address
+  if (!filled(form.city)) errors.city = REQUIRED_MESSAGES.city
+  if (!filled(form.country)) errors.country = REQUIRED_MESSAGES.country
+  else if (!isIsoCountryCode(form.country)) errors.country = INVALID_MESSAGES.country
   return errors
 }

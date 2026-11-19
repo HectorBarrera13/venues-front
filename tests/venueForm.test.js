@@ -5,6 +5,9 @@ import {
   countryOptions,
   initialVenueForm,
   isIsoCountryCode,
+  apiFieldErrorMessage,
+  revealRejectedPlaceFields,
+  visiblePlaceFields,
   validateVenueForm,
 } from '../src/services/venueForm.js'
 
@@ -114,4 +117,28 @@ test('country options contain real countries sorted by Spanish name', () => {
   assert.equal(options.find((option) => option.code === 'MX').name, 'México')
   const names = options.map((option) => option.name)
   assert.deepEqual(names, [...names].sort((a, b) => a.localeCompare(b, 'es')))
+})
+
+test('backend 400 messages become the same Spanish wording as the client validation', () => {
+  assert.equal(apiFieldErrorMessage('city', 'Field "city" is required'), 'La ciudad es obligatoria.')
+  assert.equal(apiFieldErrorMessage('name', 'Field "name" is required'), validateVenueForm(initialVenueForm).name)
+  assert.match(apiFieldErrorMessage('country', 'Field "country" must be an ISO 3166-1 alpha-2 country code'), /ISO/)
+  assert.equal(
+    apiFieldErrorMessage('address', 'Field "address" must be at most 200 characters'),
+    'La dirección admite como máximo 200 caracteres.',
+  )
+  assert.match(apiFieldErrorMessage('location', 'Field "lat" must be a number between -90 and 90'), /mapa/)
+  assert.equal(apiFieldErrorMessage('unknown', 'whatever'), 'Revisa este campo.')
+})
+
+test('a rejected prefilled place field becomes a visible input', () => {
+  const form = applyPlaceToForm(initialVenueForm, completePlace)
+  assert.deepEqual(form.manualFields, [])
+  const revealed = revealRejectedPlaceFields(form, { country: 'bad', name: 'bad', location: 'bad' })
+  assert.deepEqual(revealed.manualFields, []) // the map did provide it
+  assert.deepEqual(revealed.revealedFields, ['country'])
+  assert.deepEqual(visiblePlaceFields(revealed), ['country'])
+  assert.equal(revealed.country, 'MX') // keeps the value so the person can fix it
+  assert.equal(revealRejectedPlaceFields(revealed, { country: 'bad' }), revealed) // no-op when already visible
+  assert.deepEqual(applyPlaceToForm(revealed, completePlace).revealedFields, []) // a new pick starts over
 })

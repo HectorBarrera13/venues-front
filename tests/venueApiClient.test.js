@@ -146,6 +146,73 @@ test('other API errors carry no existingVenueId', async () => {
   })
 })
 
+// VEN-405: every 400 lands on the input it is about.
+const rejectsWithFields = (promise, expected) => assert.rejects(promise, (error) => {
+  assert.equal(error.status, 400)
+  assert.deepEqual(Object.keys(error.fieldErrors).sort(), [...expected].sort())
+  assert.equal(error.field, expected[0] ?? null)
+  return true
+})
+
+test('mock 400s land on address, city, country and location', async () => {
+  await rejectsWithFields(client.createVenue({ ...registerForm, country: 'ZZ' }), ['country'])
+  await rejectsWithFields(client.createVenue({ ...registerForm, city: ' ' }), ['city'])
+  await rejectsWithFields(client.createVenue({ ...registerForm, address: '' }), ['address'])
+  await rejectsWithFields(client.createVenue({ ...registerForm, lat: 95 }), ['location'])
+  await rejectsWithFields(client.createVenue({ ...registerForm, name: '' }), ['name'])
+})
+
+test('a 400 with the backend errors list maps every invalid field', async (context) => {
+  context.mock.method(globalThis, 'fetch', async () => Response.json({
+    error: 'Invalid venue data',
+    field: 'name',
+    message: 'Field "name" is required',
+    errors: [
+      { field: 'name', message: 'Field "name" is required' },
+      { field: 'country', message: 'Field "country" must be an ISO 3166-1 alpha-2 country code' },
+      { field: 'lat', message: 'Field "lat" must be a number between -90 and 90' },
+      { field: 'osmRef', message: 'Field "osmRef" must look like "node:123"' },
+    ],
+  }, { status: 400 }))
+  await assert.rejects(client.createVenue(registerForm), (error) => {
+    assert.deepEqual(error.fieldErrors, {
+      name: 'Field "name" is required',
+      country: 'Field "country" must be an ISO 3166-1 alpha-2 country code',
+      location: 'Field "lat" must be a number between -90 and 90', // first location-related error wins
+    })
+    assert.equal(error.field, 'name')
+    return true
+  })
+})
+
+test('a 400 about an unknown field has no field errors (generic error)', async (context) => {
+  context.mock.method(globalThis, 'fetch', async () => Response.json({
+    error: 'Invalid venue data',
+    field: 'capacity',
+    message: 'Field "capacity" must be a number',
+    errors: [{ field: 'capacity', message: 'Field "capacity" must be a number' }],
+  }, { status: 400 }))
+  await assert.rejects(client.createVenue(registerForm), (error) => {
+    assert.equal(error.status, 400)
+    assert.deepEqual(error.fieldErrors, {})
+    assert.equal(error.field, null)
+    assert.equal(error.message, 'Invalid venue data')
+    return true
+  })
+})
+
+test('resolveFieldErrors reads Spanish aliases and messages without a field', async () => {
+  const { resolveFieldErrors } = await import('../src/services/VenueApiClient.js')
+  assert.deepEqual(resolveFieldErrors({ field: 'País' }, 'País inválido'), { country: 'País inválido' })
+  assert.deepEqual(resolveFieldErrors({ errors: ['ciudad'] }, 'Falta la ciudad'), { city: 'Falta la ciudad' })
+  assert.deepEqual(
+    resolveFieldErrors({ error: 'Field "location.lat" must be a number' }, 'Field "location.lat" must be a number'),
+    { location: 'Field "location.lat" must be a number' },
+  )
+  assert.deepEqual(resolveFieldErrors({ error: 'Request body must be valid JSON' }, 'Request body must be valid JSON'), {})
+  assert.deepEqual(resolveFieldErrors(null, 'boom'), {})
+})
+
 test('getVenues surfaces API errors with their status', async () => {
   storage.delete(TOKEN_STORAGE_KEY)
   await assert.rejects(client.getVenues(), (error) => error.status === 401)

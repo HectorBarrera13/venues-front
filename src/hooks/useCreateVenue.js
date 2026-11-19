@@ -14,12 +14,15 @@ import { canPerformAction } from '../auth/access.js'
  * a validation error from a session error from a permission error.
  *
  * @returns {{
- *   createVenue: (data: import('../services/VenueApiClient.js').CreateVenueInput) => Promise<object | undefined>,
+ *   createVenue: (
+ *     data: import('../services/VenueApiClient.js').CreateVenueInput,
+ *     options?: { onError?: (error: Error) => void },
+ *   ) => Promise<object | undefined>,
  *   reset: () => void,
  *   isLoading: boolean,
  *   isSuccess: boolean,
  *   isError: boolean,
- *   error: (Error & { status?: number, field?: string | null }) | null,
+ *   error: (Error & { status?: number, field?: string | null, fieldErrors?: Record<string, string> }) | null,
  *   venue: object | null,
  * }}
  */
@@ -44,7 +47,7 @@ function useCreateVenue() {
   }, [])
 
   const createVenue = useCallback(
-    async (data) => {
+    async (data, { onError } = {}) => {
       if (inFlightRef.current) return undefined
       const requestId = (requestIdRef.current += 1)
       setIsLoading(true)
@@ -70,6 +73,7 @@ function useCreateVenue() {
         if (requestIdRef.current !== requestId || getSession()?.token !== session.token) return undefined
         setError(requestError)
         setIsSuccess(false)
+        onError?.(requestError) // e.g. the form places a 400 next to its inputs
         return undefined
       } finally {
         if (requestIdRef.current === requestId) {
