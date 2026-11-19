@@ -1014,6 +1014,18 @@
   color: #0272e5;
   font-size: 0.78rem;
 }
+/* Map service failure with a retry button (VEN-406). */
+.location-picker-retry {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+.location-picker-retry .secondary-button {
+  min-height: 34px;
+  padding: 0 14px;
+  font-size: 0.78rem;
+}
 .location-picker-address {
   width: 100%;
   border: 1px solid #cbd8e8;
@@ -1059,6 +1071,26 @@
   padding: 12px 14px;
   border-radius: 8px;
   background: #fff0f2;
+}
+/* Informative, not an error: e.g. the venue is already registered (409). */
+.form-notice {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 22px;
+  padding: 12px 14px;
+  border-radius: 8px;
+  border: 1px solid #cfe3fb;
+  background: #eef6ff;
+  color: #17345c;
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+.form-notice p {
+  flex: 1 1 260px;
+  margin: 0;
 }
 .form-actions {
   display: flex;

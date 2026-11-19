@@ -1,4 +1,24 @@
 /**
+ * Route of a venue's page (C4, VEN-606).
+ *
+ * @param {string} venueId
+ * @returns {string}
+ */
+export function venuePath(venueId) {
+  return `/venues/${encodeURIComponent(venueId)}`
+}
+
+/**
+ * Route of the seat map editor (C2) for a venue.
+ *
+ * @param {string} venueId
+ * @returns {string}
+ */
+export function mapEditorPath(venueId) {
+  return `/venues/${encodeURIComponent(venueId)}/map`
+}
+
+/**
  * Human-readable location of a venue: "address, city, COUNTRY".
  *
  * The venue-service contract (VEN-003) exposes the address fields plus

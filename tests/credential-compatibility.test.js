@@ -107,12 +107,16 @@ test('actual Venue and Events clients send separate credentials and preserve req
   })
   const venues = new VenueApiClient('http://venue.example')
   await venues.getVenues()
-  await venues.createVenue({ name: ' Arena ', description: ' Description ', location: ' City ' })
+  await venues.createVenue({
+    name: ' Arena ', description: ' Description ', address: ' Street 1 ', city: ' City ', country: 'mx', lat: 19.4, lng: -99.1,
+  })
   await new EventsApiClient('http://events.example').createEvent({ name: 'Concert', artist: 'Artist', date: '2099-12-01T20:00:00Z', venue_id: 'venue' })
   assert.equal(requests[0].url, 'http://venue.example/venues?page=1&limit=100')
   assert.equal(requests[0].options.headers.Authorization, `Bearer ${venueJwt}`)
   assert.equal(requests[1].options.headers.Authorization, `Bearer ${venueJwt}`)
-  assert.deepEqual(JSON.parse(requests[1].options.body), { name: 'Arena', description: 'Description', location: 'City' })
+  assert.deepEqual(JSON.parse(requests[1].options.body), {
+    name: 'Arena', description: 'Description', address: 'Street 1', city: 'City', country: 'MX', location: { lat: 19.4, lng: -99.1 },
+  })
   assert.equal(requests[2].options.headers.Authorization, `Bearer ${organizerMock}`)
   persistToken(null)
 })

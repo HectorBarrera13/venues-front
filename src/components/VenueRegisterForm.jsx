@@ -1,78 +1,133 @@
 // src/components/VenueRegisterForm.jsx
 //
-// "Registrar venue": validates name/description/location on the client, then
-// POSTs them to /venues. Statuses the backend answers with get their own
-// treatment — 201 replaces the form with VenueConfirmation, a 400 lands on the
-// input it rejected, a 401 goes to sign-in and a 403 says no.
+// "Registrar venue": the map picker (VEN-401) prefills name, address, city and
+// country; whatever the map couldn't provide is asked for with its own input
+// and is required before submitting (VEN-402). Validation runs on the client
+// before any request. Statuses the backend answers with get their own
+// treatment — 201 replaces the form with VenueConfirmation, a 400 lands on
+// every input it rejected (VEN-405; a prefilled place field that was hidden is
+// shown so its error has a place), a 401 goes to sign-in and a 403 says no.
+// A 400 about a field the form doesn't know falls back to the summary. A 409 is not
+// treated as an error (VEN-404): the place is already registered, so the form
+// keeps its data and offers to open the existing venue instead.
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useCreateVenue } from "../hooks/useCreateVenue";
 import { ApiClientError } from "../services/VenueApiClient.js";
+import {
+  apiFieldErrorMessage,
+  applyPlaceToForm,
+  countryOptions,
+  initialVenueForm,
+  revealRejectedPlaceFields,
+  validateVenueForm,
+  visiblePlaceFields,
+} from "../services/venueForm.js";
+import { venuePath } from "../services/venueFormat.js";
 import LocationMapPicker from "./LocationMapPicker.jsx";
 import { VenueConfirmation } from "./VenueConfirmation";
 
-const initialForm = { name: "", description: "", location: "" };
-
-function validate(form) {
-  const errors = {};
-  if (!form.name.trim()) errors.name = "El nombre es obligatorio.";
-  if (!form.description.trim())
-    errors.description = "La descripción es obligatoria.";
-  if (!form.location.trim()) errors.location = "La ubicación es obligatoria.";
-  return errors;
-}
+const PLACE_ERROR_FIELDS = ["location", "address", "city", "country"];
 
 export function VenueRegisterForm() {
-  const [form, setForm] = useState(initialForm);
+  const [form, setForm] = useState(initialVenueForm);
   const [fieldErrors, setFieldErrors] = useState({});
   const { createVenue, reset, isLoading, isSuccess, isError, error, venue } =
     useCreateVenue();
+  const countries = useMemo(() => countryOptions("es"), []);
 
   const apiErrorStatus = error instanceof ApiClientError ? error.status : null;
+  const isDuplicate = apiErrorStatus === 409;
+  const apiFieldErrors =
+    apiErrorStatus === 400 ? Object.keys(error.fieldErrors ?? {}) : [];
 
   function errorFor(field) {
     return fieldErrors[field];
   }
 
-  function dismissApiFieldError() {
-    // No-op for now as API field errors are handled differently
+  function clearErrors(fields) {
+    setFieldErrors((prev) => {
+      const next = { ...prev };
+      for (const field of fields) delete next[field];
+      return next;
+    });
   }
 
   function handleChange(field) {
     return (event) => {
       setForm((prev) => ({ ...prev, [field]: event.target.value }));
-      setFieldErrors((prev) => ({ ...prev, [field]: undefined }));
-      dismissApiFieldError();
+      clearErrors([field]);
     };
   }
 
-  function handleLocationChange(address) {
-    setForm((prev) => ({ ...prev, location: address }));
-    setFieldErrors((prev) => ({ ...prev, location: undefined }));
-    dismissApiFieldError();
+  function handleLocationChange(label) {
+    setForm((prev) => ({ ...prev, location: label }));
+  }
+
+  function handlePlaceChange(place) {
+    setForm((prev) => applyPlaceToForm(prev, place));
+    clearErrors([...PLACE_ERROR_FIELDS, "name"]);
+    // The "already registered" notice was about the previous place.
+    if (isDuplicate) reset();
   }
 
   async function handleSubmit(event) {
     event.preventDefault();
 
-    const errors = validate(form);
+    const errors = validateVenueForm(form);
     if (Object.keys(errors).length > 0) {
       setFieldErrors(errors);
       return;
     }
 
-    const createdVenue = await createVenue(form);
+    const createdVenue = await createVenue(form, { onError: showApiFieldErrors });
     if (createdVenue) {
-      setForm(initialForm);
+      setForm(initialVenueForm);
       setFieldErrors({});
     }
   }
 
+  function showApiFieldErrors(requestError) {
+    if (!(requestError instanceof ApiClientError) || requestError.status !== 400) return;
+    const rejected = Object.entries(requestError.fieldErrors ?? {});
+    if (rejected.length === 0) return; // unknown field: the summary explains it
+
+    setFieldErrors(
+      Object.fromEntries(
+        rejected.map(([field, message]) => [field, apiFieldErrorMessage(field, message)]),
+      ),
+    );
+    setForm((prev) => revealRejectedPlaceFields(prev, requestError.fieldErrors));
+  }
+
   function handleRegisterAnother() {
-    setForm(initialForm);
+    setForm(initialVenueForm);
     setFieldErrors({});
     reset();
   }
+
+  function renderError(field) {
+    return (
+      errorFor(field) && (
+        <p className="form-error" role="alert" id={`venue-${field}-error`}>
+          {errorFor(field)}
+        </p>
+      )
+    );
+  }
+
+  function inputProps(field) {
+    return {
+      id: `venue-${field}`,
+      value: form[field],
+      onChange: handleChange(field),
+      required: true,
+      "aria-invalid": errorFor(field) ? true : undefined,
+      "aria-describedby": errorFor(field) ? `venue-${field}-error` : undefined,
+    };
+  }
+
+  const manualFields = visiblePlaceFields(form);
 
   if (isSuccess) {
     return (
@@ -103,17 +158,8 @@ export function VenueRegisterForm() {
         <div className="form-fields">
           <div className="form-field form-field--full">
             <label htmlFor="venue-name">Nombre</label>
-            <input
-              id="venue-name"
-              type="text"
-              value={form.name}
-              onChange={handleChange("name")}
-            />
-            {errorFor("name") && (
-              <p className="form-error" role="alert">
-                {errorFor("name")}
-              </p>
-            )}
+            <input type="text" {...inputProps("name")} />
+            {renderError("name")}
           </div>
 
           <div className="form-field form-field--full">
@@ -122,33 +168,95 @@ export function VenueRegisterForm() {
               id="venue-location"
               value={form.location}
               onChange={handleLocationChange}
+              onPlaceChange={handlePlaceChange}
             />
-            {errorFor("location") && (
-              <p className="form-error" role="alert">
-                {errorFor("location")}
-              </p>
-            )}
+            {renderError("location")}
           </div>
+
+          {form.manualFields.length > 0 && (
+            <p
+              className="location-picker-status form-field--full"
+              role="status"
+            >
+              El mapa no nos dio todos los datos de este lugar. Completa los
+              campos que faltan.
+            </p>
+          )}
+
+          {manualFields.includes("address") && (
+            <div className="form-field form-field--full">
+              <label htmlFor="venue-address">Dirección</label>
+              <input
+                type="text"
+                autoComplete="street-address"
+                placeholder="Calle y número"
+                {...inputProps("address")}
+              />
+              {renderError("address")}
+            </div>
+          )}
+
+          {manualFields.includes("city") && (
+            <div className="form-field">
+              <label htmlFor="venue-city">Ciudad</label>
+              <input
+                type="text"
+                autoComplete="address-level2"
+                {...inputProps("city")}
+              />
+              {renderError("city")}
+            </div>
+          )}
+
+          {manualFields.includes("country") && (
+            <div className="form-field">
+              <label htmlFor="venue-country">País</label>
+              <select {...inputProps("country")}>
+                <option value="">Selecciona un país</option>
+                {countries.map((country) => (
+                  <option key={country.code} value={country.code}>
+                    {country.name} ({country.code})
+                  </option>
+                ))}
+              </select>
+              {renderError("country")}
+            </div>
+          )}
 
           <div className="form-field form-field--full">
             <label htmlFor="venue-description">Descripción</label>
-            <textarea
-              id="venue-description"
-              rows="5"
-              value={form.description}
-              onChange={handleChange("description")}
-            />
-            {errorFor("description") && (
-              <p className="form-error" role="alert">
-                {errorFor("description")}
-              </p>
-            )}
+            <textarea rows="5" {...inputProps("description")} />
+            {renderError("description")}
           </div>
         </div>
 
-        {isError && (
+        {isDuplicate && (
+          <div className="form-notice" role="status">
+            <p>
+              <strong>Este lugar ya está registrado.</strong>{" "}
+              {error.existingVenueId
+                ? "Ya existe un recinto en este punto del mapa. Puedes abrirlo en lugar de registrarlo de nuevo."
+                : "Ya existe un recinto en este punto del mapa. Revisa tus recintos o elige otro lugar."}
+            </p>
+            {error.existingVenueId && (
+              <a
+                className="secondary-button"
+                href={venuePath(error.existingVenueId)}
+              >
+                Ver el recinto registrado
+              </a>
+            )}
+          </div>
+        )}
+
+        {isError && !isDuplicate && (
           <p className="form-error form-error--summary" role="alert">
-            {apiErrorStatus === 400 ? (
+            {apiErrorStatus === 400 && apiFieldErrors.length > 0 ? (
+              <>
+                <strong>Revisa los datos del recinto.</strong> Corrige los
+                campos marcados y vuelve a intentarlo.
+              </>
+            ) : apiErrorStatus === 400 ? (
               <>
                 <strong>Revisa los datos del recinto.</strong> {error.message}
               </>

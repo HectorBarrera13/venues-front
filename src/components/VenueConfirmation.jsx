@@ -1,9 +1,14 @@
 // src/components/VenueConfirmation.jsx
 //
-// Shown by VenueRegisterForm after a successful POST /venues.
-import { formatVenueLocation } from '../services/venueFormat.js'
+// Shown by VenueRegisterForm after a successful POST /venues (201). A new venue
+// always starts without a seat map (`latestMapVersion: 0`), so the next step
+// offered is drawing it (C2, the map editor at /venues/{id}/map).
+import { formatVenueLocation, mapEditorPath } from '../services/venueFormat.js'
 
 export function VenueConfirmation({ venue, onRegisterAnother }) {
+  const hasMap = Number(venue?.latestMapVersion) > 0
+  const canDrawMap = Boolean(venue?.id) && !hasMap
+
   return (
     <section className="venue-register-page" aria-labelledby="confirmation-title">
       <div className="venue-confirmation" role="status">
@@ -19,11 +24,26 @@ export function VenueConfirmation({ venue, onRegisterAnother }) {
             <strong>{venue.name}</strong> quedó registrado en {formatVenueLocation(venue)}.
           </p>
         )}
+        {canDrawMap && (
+          <p className="confirmation-copy">
+            Todavía no tiene mapa de asientos. Dibújalo para que los organizadores
+            puedan programar eventos en él.
+          </p>
+        )}
         <div className="form-actions form-actions--center">
           <a className="secondary-button" href="/">Volver a mis recintos</a>
-          <button className="primary-button" type="button" onClick={onRegisterAnother}>
+          <button
+            className={canDrawMap ? 'secondary-button' : 'primary-button'}
+            type="button"
+            onClick={onRegisterAnother}
+          >
             Registrar otro recinto
           </button>
+          {canDrawMap && (
+            <a className="primary-button" href={mapEditorPath(venue.id)}>
+              Dibujar el mapa
+            </a>
+          )}
         </div>
       </div>
     </section>
