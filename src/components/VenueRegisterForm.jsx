@@ -5,7 +5,9 @@
 // and is required before submitting (VEN-402). Validation runs on the client
 // before any request. Statuses the backend answers with get their own
 // treatment — 201 replaces the form with VenueConfirmation, a 400 lands on the
-// input it rejected, a 401 goes to sign-in and a 403 says no.
+// input it rejected, a 401 goes to sign-in and a 403 says no. A 409 is not
+// treated as an error (VEN-404): the place is already registered, so the form
+// keeps its data and offers to open the existing venue instead.
 
 import { useMemo, useState } from "react";
 import { useCreateVenue } from "../hooks/useCreateVenue";
@@ -16,6 +18,7 @@ import {
   initialVenueForm,
   validateVenueForm,
 } from "../services/venueForm.js";
+import { venuePath } from "../services/venueFormat.js";
 import LocationMapPicker from "./LocationMapPicker.jsx";
 import { VenueConfirmation } from "./VenueConfirmation";
 
@@ -29,6 +32,7 @@ export function VenueRegisterForm() {
   const countries = useMemo(() => countryOptions("es"), []);
 
   const apiErrorStatus = error instanceof ApiClientError ? error.status : null;
+  const isDuplicate = apiErrorStatus === 409;
 
   function errorFor(field) {
     return fieldErrors[field];
@@ -56,6 +60,8 @@ export function VenueRegisterForm() {
   function handlePlaceChange(place) {
     setForm((prev) => applyPlaceToForm(prev, place));
     clearErrors([...PLACE_ERROR_FIELDS, "name"]);
+    // The "already registered" notice was about the previous place.
+    if (isDuplicate) reset();
   }
 
   async function handleSubmit(event) {
@@ -204,7 +210,26 @@ export function VenueRegisterForm() {
           </div>
         </div>
 
-        {isError && (
+        {isDuplicate && (
+          <div className="form-notice" role="status">
+            <p>
+              <strong>Este lugar ya está registrado.</strong>{" "}
+              {error.existingVenueId
+                ? "Ya existe un recinto en este punto del mapa. Puedes abrirlo en lugar de registrarlo de nuevo."
+                : "Ya existe un recinto en este punto del mapa. Revisa tus recintos o elige otro lugar."}
+            </p>
+            {error.existingVenueId && (
+              <a
+                className="secondary-button"
+                href={venuePath(error.existingVenueId)}
+              >
+                Ver el recinto registrado
+              </a>
+            )}
+          </div>
+        )}
+
+        {isError && !isDuplicate && (
           <p className="form-error form-error--summary" role="alert">
             {apiErrorStatus === 400 ? (
               <>

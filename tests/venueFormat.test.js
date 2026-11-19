@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { formatVenueLocation, mapEditorPath } from '../src/services/venueFormat.js'
+import { formatVenueLocation, mapEditorPath, venuePath } from '../src/services/venueFormat.js'
 
 test('formats address, city and country of the venue contract', () => {
   assert.equal(
@@ -18,4 +18,9 @@ test('skips missing parts and keeps a locally edited text location', () => {
 test('map editor path encodes the venue id', () => {
   assert.equal(mapEditorPath('abc123'), '/venues/abc123/map')
   assert.equal(mapEditorPath('a/b'), '/venues/a%2Fb/map')
+})
+
+test('venue page path encodes the venue id', () => {
+  assert.equal(venuePath('mock-venue-2'), '/venues/mock-venue-2')
+  assert.equal(venuePath('a b'), '/venues/a%20b')
 })

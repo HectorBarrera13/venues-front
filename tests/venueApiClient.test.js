@@ -110,9 +110,40 @@ test('createVenue leaves out optional ids the picker could not provide', async (
   assert.deepEqual(Object.keys(body).sort(), ['address', 'city', 'country', 'location', 'name'])
 })
 
-test('createVenue surfaces a duplicated osmRef as 409', async () => {
-  await client.createVenue(registerForm)
-  await assert.rejects(client.createVenue(registerForm), (error) => error.status === 409)
+test('createVenue surfaces a duplicated osmRef as 409 with the existing venue id', async () => {
+  const original = await client.createVenue(registerForm)
+  await assert.rejects(client.createVenue(registerForm), (error) => {
+    assert.equal(error.name, 'ApiClientError')
+    assert.equal(error.status, 409)
+    assert.equal(error.existingVenueId, original.id)
+    assert.equal(error.field, null) // not a field error
+    return true
+  })
+})
+
+test('a 409 without existingVenueId degrades to a null id instead of crashing', async (context) => {
+  for (const body of [{ error: 'venue already exists' }, { existingVenueId: '  ' }, null]) {
+    context.mock.method(globalThis, 'fetch', async () => (
+      body === null
+        ? new Response('conflict', { status: 409 })
+        : Response.json(body, { status: 409 })
+    ))
+    await assert.rejects(client.createVenue(registerForm), (error) => {
+      assert.equal(error.status, 409)
+      assert.equal(error.existingVenueId, null)
+      assert.ok(error.message)
+      return true
+    })
+    context.mock.restoreAll()
+  }
+})
+
+test('other API errors carry no existingVenueId', async () => {
+  await assert.rejects(client.createVenue({ ...registerForm, city: '' }), (error) => {
+    assert.equal(error.status, 400)
+    assert.equal(error.existingVenueId, null)
+    return true
+  })
 })
 
 test('getVenues surfaces API errors with their status', async () => {

@@ -1,4 +1,14 @@
 /**
+ * Route of a venue's page (C4, VEN-606).
+ *
+ * @param {string} venueId
+ * @returns {string}
+ */
+export function venuePath(venueId) {
+  return `/venues/${encodeURIComponent(venueId)}`
+}
+
+/**
  * Route of the seat map editor (C2) for a venue.
  *
  * @param {string} venueId

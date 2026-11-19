@@ -64,13 +64,23 @@ class ApiClientError extends Error {
    *   backend's { error: message } body when available).
    * @param {number} status - HTTP status code (e.g. 400, 403, 500).
    * @param {string | null} [field] - Venue field a 400 rejected, when known.
+   * @param {{ existingVenueId?: string | null }} [details] - Extra data of
+   *   the error body: a 409 on POST /venues names the venue already
+   *   registered at that place (VEN-404).
    */
-  constructor(message, status, field = null) {
+  constructor(message, status, field = null, { existingVenueId = null } = {}) {
     super(message)
     this.name = 'ApiClientError'
     this.status = status
     this.field = field
+    this.existingVenueId = existingVenueId
   }
+}
+
+/** `existingVenueId` of a 409 body, or null when missing or malformed. */
+function readExistingVenueId(payload) {
+  const id = payload?.existingVenueId
+  return typeof id === 'string' && id.trim() ? id.trim() : null
 }
 
 /**
@@ -230,6 +240,15 @@ class VenueApiClient {
     const payload = await response.json().catch(() => null)
 
     if (!response.ok) {
+      if (response.status === 409) {
+        // Not a field error: the place itself is already registered.
+        throw new ApiClientError(
+          payload?.error || 'Este lugar ya está registrado.',
+          409,
+          null,
+          { existingVenueId: readExistingVenueId(payload) },
+        )
+      }
       const message = payload?.error || 'No pudimos registrar el recinto en este momento.'
       throw new ApiClientError(message, response.status, resolveErrorField(payload, message))
     }
