@@ -14,7 +14,7 @@ import { canPerformAction } from '../auth/access.js'
  * a validation error from a session error from a permission error.
  *
  * @returns {{
- *   createVenue: (data: { name: string, description: string, location: string }) => Promise<object | undefined>,
+ *   createVenue: (data: import('../services/VenueApiClient.js').CreateVenueInput) => Promise<object | undefined>,
  *   reset: () => void,
  *   isLoading: boolean,
  *   isSuccess: boolean,
@@ -29,10 +29,14 @@ function useCreateVenue() {
   const [isSuccess, setIsSuccess] = useState(false)
   const [venue, setVenue] = useState(null)
   const requestIdRef = useRef(0)
+  // Set synchronously, so a double click that fires two submits before React
+  // re-renders the disabled button still sends a single POST (VEN-403).
+  const inFlightRef = useRef(false)
   useEffect(() => () => { requestIdRef.current += 1 }, [])
 
   const reset = useCallback(() => {
     requestIdRef.current += 1 // invalidate any in-flight request
+    inFlightRef.current = false
     setIsLoading(false)
     setError(null)
     setIsSuccess(false)
@@ -41,6 +45,7 @@ function useCreateVenue() {
 
   const createVenue = useCallback(
     async (data) => {
+      if (inFlightRef.current) return undefined
       const requestId = (requestIdRef.current += 1)
       setIsLoading(true)
       setError(null)
@@ -53,6 +58,7 @@ function useCreateVenue() {
         return undefined
       }
 
+      inFlightRef.current = true
       try {
         const createdVenue = await venueApiClient.createVenue(data)
         if (requestIdRef.current !== requestId || getSession()?.token !== session.token) return undefined
@@ -66,7 +72,10 @@ function useCreateVenue() {
         setIsSuccess(false)
         return undefined
       } finally {
-        if (requestIdRef.current === requestId) setIsLoading(false)
+        if (requestIdRef.current === requestId) {
+          inFlightRef.current = false
+          setIsLoading(false)
+        }
       }
     },
     [],

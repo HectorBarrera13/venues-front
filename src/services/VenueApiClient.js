@@ -73,6 +73,53 @@ class ApiClientError extends Error {
   }
 }
 
+/**
+ * @typedef {{
+ *   name: string, description?: string | null, address: string, city: string,
+ *   country: string, lat: number, lng: number, externalId?: string | null,
+ *   externalSource?: string | null, osmRef?: string | null,
+ * }} CreateVenueInput
+ */
+
+const trimmedOrNull = (value) => {
+  if (typeof value !== 'string') return null
+  const trimmed = value.trim()
+  return trimmed || null
+}
+
+/**
+ * Body of POST /venues (CreateVenue in the OpenAPI contract): only the fields
+ * the contract defines, trimmed, with `location: { lat, lng }` and an upper
+ * case country. Optional fields are left out when empty. Anything else —
+ * `ownerId` included — never leaves the browser.
+ *
+ * @param {CreateVenueInput} data
+ */
+function toCreateVenueBody(data) {
+  const body = {
+    name: trimmedOrNull(data?.name),
+    address: trimmedOrNull(data?.address),
+    city: trimmedOrNull(data?.city),
+    country: trimmedOrNull(data?.country)?.toUpperCase() ?? null,
+    location: { lat: data?.lat, lng: data?.lng },
+  }
+
+  const description = trimmedOrNull(data?.description)
+  if (description) body.description = description
+
+  const externalId = trimmedOrNull(data?.externalId)
+  const externalSource = trimmedOrNull(data?.externalSource)
+  if (externalId && externalSource) {
+    body.externalId = externalId
+    body.externalSource = externalSource
+  }
+
+  const osmRef = trimmedOrNull(data?.osmRef)
+  if (osmRef) body.osmRef = osmRef
+
+  return body
+}
+
 // Largest page the API serves (GET /venues limit).
 const VENUE_PAGE_SIZE = 100
 
@@ -144,15 +191,16 @@ class VenueApiClient {
   }
 
   /**
-   * Registers a new venue.
+   * Registers a new venue (VEN-403).
    *
-   * POSTs the venue's data to /venues with the access token as a Bearer
-   * credential. `ownerId` is never sent: the backend resolves the owner from
-   * the token itself, and it is the only place that validates the role.
+   * POSTs the CreateVenue body of the contract (see `toCreateVenueBody`) to
+   * /venues with the access token as a Bearer credential. `ownerId` is never
+   * sent: the backend resolves the owner from the token itself, and it is the
+   * only place that validates the role.
    *
-   * @param {{ name: string, description: string, location: string }} data
+   * @param {CreateVenueInput} data Usually the register form state.
    * @param {{ signal?: AbortSignal }} [options]
-   * @returns {Promise<object>} The created venue, as returned by the API
+   * @returns {Promise<object>} The created venue (201), with `latestMapVersion: 0`
    * @throws {ApiClientError} When the backend responds with a 4xx/5xx and
    *   a JSON `{ error }` body: 400 for a rejected field (with the field on
    *   `error.field`), 401 for an expired/invalid token, 403 for a session
@@ -171,11 +219,7 @@ class VenueApiClient {
           Accept: 'application/json',
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
-        body: JSON.stringify({
-          name: data?.name?.trim(),
-          description: data?.description?.trim(),
-          location: data?.location?.trim(),
-        }),
+        body: JSON.stringify(toCreateVenueBody(data)),
         signal,
       })
     } catch (error) {
@@ -199,5 +243,5 @@ class VenueApiClient {
 }
 
 const venueApiClient = new VenueApiClient()
-export { VenueApiClient, ApiClientError }
+export { VenueApiClient, ApiClientError, toCreateVenueBody }
 export default venueApiClient
