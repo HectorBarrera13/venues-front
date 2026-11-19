@@ -1,14 +1,37 @@
 import { getVenueToken } from '../auth/token.js'
 
 // A 400 names the field it rejected; these are the words it may use in that
-// name or in its message, so a validation error can land next to its input.
+// name or in its message, so a validation error can land next to its input
+// (VEN-405). Keys are folded (lower case, no accents). Everything about the
+// point itself — coordinates and the OSM/Nominatim ids — lands on the map
+// picker ("location"): the person fixes it by picking the place again.
 const FIELD_ALIASES = {
   name: 'name',
   nombre: 'name',
   description: 'description',
   descripcion: 'description',
+  address: 'address',
+  direccion: 'address',
+  city: 'city',
+  ciudad: 'city',
+  country: 'country',
+  pais: 'country',
   location: 'location',
   ubicacion: 'location',
+  'location.lat': 'location',
+  'location.lng': 'location',
+  lat: 'location',
+  lng: 'location',
+  lon: 'location',
+  latitude: 'location',
+  longitude: 'location',
+  latitud: 'location',
+  longitud: 'location',
+  coordinates: 'location',
+  coordenadas: 'location',
+  osmref: 'location',
+  externalid: 'location',
+  externalsource: 'location',
 }
 
 function toFieldName(value) {
@@ -20,34 +43,56 @@ function toFieldName(value) {
 function foldText(value) {
   return String(value)
     .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[̀-ͯ]/g, '')
     .trim()
     .toLowerCase()
 }
 
-/**
- * Works out which venue field a 400 is about, from the body first
- * ({ field } / { errors: [{ field }] }) and from the message as a fallback.
- *
- * @returns {'name' | 'description' | 'location' | null}
- */
-function resolveErrorField(payload, message) {
-  const candidates = [
-    payload?.field,
-    payload?.fieldName,
-    ...(Array.isArray(payload?.errors) ? payload.errors.map((entry) => entry?.field ?? entry) : []),
-    ...(Array.isArray(payload?.details) ? payload.details.map((entry) => entry?.field ?? entry) : []),
-  ]
-  for (const candidate of candidates) {
-    const fieldName = toFieldName(candidate)
-    if (fieldName) return fieldName
-  }
+const escapeRegExp = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+
+/** Field named by a message alone: `Field "country" ...` first, then any alias word. */
+function fieldFromMessage(message) {
+  if (typeof message !== 'string') return null
+  const quoted = message.match(/field\s+"([^"]+)"/i)
+  if (quoted) return toFieldName(quoted[1])
 
   const text = foldText(message)
   for (const [alias, fieldName] of Object.entries(FIELD_ALIASES)) {
-    if (new RegExp(`\\b${alias}\\b`).test(text)) return fieldName
+    if (new RegExp(`(^|[^\\w.])${escapeRegExp(alias)}($|[^\\w.])`).test(text)) return fieldName
   }
   return null
+}
+
+/**
+ * Every form field a 400 is about, with the backend's message for it.
+ *
+ * Reads the contract's `{ errors: [{ field, message }] }` (all invalid fields,
+ * VenueValidationError), then `{ field, message }`, then — for bodies that only
+ * carry `{ error }` — the field named in the message. Fields the form doesn't
+ * know are left out, so the caller can fall back to a generic error.
+ *
+ * @returns {Record<string, string>} e.g. `{ country: 'Field "country" must be ...' }`
+ */
+function resolveFieldErrors(payload, message) {
+  const entries = [
+    ...(Array.isArray(payload?.errors) ? payload.errors : []),
+    ...(Array.isArray(payload?.details) ? payload.details : []),
+    { field: payload?.field ?? payload?.fieldName, message: payload?.message },
+  ]
+
+  const fieldErrors = {}
+  for (const entry of entries) {
+    const isText = typeof entry === 'string'
+    const fieldName = toFieldName(isText ? entry : entry?.field) ?? (isText ? null : fieldFromMessage(entry?.message))
+    if (!fieldName || fieldErrors[fieldName]) continue
+    fieldErrors[fieldName] = (!isText && typeof entry?.message === 'string' && entry.message) || message
+  }
+
+  if (Object.keys(fieldErrors).length === 0) {
+    const fieldName = fieldFromMessage(message)
+    if (fieldName) fieldErrors[fieldName] = message
+  }
+  return fieldErrors
 }
 
 /**
@@ -63,14 +108,73 @@ class ApiClientError extends Error {
    * @param {string} message - Human-readable error description (from the
    *   backend's { error: message } body when available).
    * @param {number} status - HTTP status code (e.g. 400, 403, 500).
-   * @param {string | null} [field] - Venue field a 400 rejected, when known.
+   * @param {string | null} [field] - First venue field a 400 rejected, when known.
+   * @param {{ existingVenueId?: string | null, fieldErrors?: Record<string, string> }} [details]
+   *   Extra data of the error body: a 409 on POST /venues names the venue
+   *   already registered at that place (VEN-404); a 400 lists every form field
+   *   it rejected with the backend's message (VEN-405).
    */
-  constructor(message, status, field = null) {
+  constructor(message, status, field = null, { existingVenueId = null, fieldErrors = {} } = {}) {
     super(message)
     this.name = 'ApiClientError'
     this.status = status
     this.field = field
+    this.existingVenueId = existingVenueId
+    this.fieldErrors = fieldErrors
   }
+}
+
+/** `existingVenueId` of a 409 body, or null when missing or malformed. */
+function readExistingVenueId(payload) {
+  const id = payload?.existingVenueId
+  return typeof id === 'string' && id.trim() ? id.trim() : null
+}
+
+/**
+ * @typedef {{
+ *   name: string, description?: string | null, address: string, city: string,
+ *   country: string, lat: number, lng: number, externalId?: string | null,
+ *   externalSource?: string | null, osmRef?: string | null,
+ * }} CreateVenueInput
+ */
+
+const trimmedOrNull = (value) => {
+  if (typeof value !== 'string') return null
+  const trimmed = value.trim()
+  return trimmed || null
+}
+
+/**
+ * Body of POST /venues (CreateVenue in the OpenAPI contract): only the fields
+ * the contract defines, trimmed, with `location: { lat, lng }` and an upper
+ * case country. Optional fields are left out when empty. Anything else —
+ * `ownerId` included — never leaves the browser.
+ *
+ * @param {CreateVenueInput} data
+ */
+function toCreateVenueBody(data) {
+  const body = {
+    name: trimmedOrNull(data?.name),
+    address: trimmedOrNull(data?.address),
+    city: trimmedOrNull(data?.city),
+    country: trimmedOrNull(data?.country)?.toUpperCase() ?? null,
+    location: { lat: data?.lat, lng: data?.lng },
+  }
+
+  const description = trimmedOrNull(data?.description)
+  if (description) body.description = description
+
+  const externalId = trimmedOrNull(data?.externalId)
+  const externalSource = trimmedOrNull(data?.externalSource)
+  if (externalId && externalSource) {
+    body.externalId = externalId
+    body.externalSource = externalSource
+  }
+
+  const osmRef = trimmedOrNull(data?.osmRef)
+  if (osmRef) body.osmRef = osmRef
+
+  return body
 }
 
 // Largest page the API serves (GET /venues limit).
@@ -144,15 +248,16 @@ class VenueApiClient {
   }
 
   /**
-   * Registers a new venue.
+   * Registers a new venue (VEN-403).
    *
-   * POSTs the venue's data to /venues with the access token as a Bearer
-   * credential. `ownerId` is never sent: the backend resolves the owner from
-   * the token itself, and it is the only place that validates the role.
+   * POSTs the CreateVenue body of the contract (see `toCreateVenueBody`) to
+   * /venues with the access token as a Bearer credential. `ownerId` is never
+   * sent: the backend resolves the owner from the token itself, and it is the
+   * only place that validates the role.
    *
-   * @param {{ name: string, description: string, location: string }} data
+   * @param {CreateVenueInput} data Usually the register form state.
    * @param {{ signal?: AbortSignal }} [options]
-   * @returns {Promise<object>} The created venue, as returned by the API
+   * @returns {Promise<object>} The created venue (201), with `latestMapVersion: 0`
    * @throws {ApiClientError} When the backend responds with a 4xx/5xx and
    *   a JSON `{ error }` body: 400 for a rejected field (with the field on
    *   `error.field`), 401 for an expired/invalid token, 403 for a session
@@ -171,11 +276,7 @@ class VenueApiClient {
           Accept: 'application/json',
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
-        body: JSON.stringify({
-          name: data?.name?.trim(),
-          description: data?.description?.trim(),
-          location: data?.location?.trim(),
-        }),
+        body: JSON.stringify(toCreateVenueBody(data)),
         signal,
       })
     } catch (error) {
@@ -186,8 +287,18 @@ class VenueApiClient {
     const payload = await response.json().catch(() => null)
 
     if (!response.ok) {
+      if (response.status === 409) {
+        // Not a field error: the place itself is already registered.
+        throw new ApiClientError(
+          payload?.error || 'Este lugar ya está registrado.',
+          409,
+          null,
+          { existingVenueId: readExistingVenueId(payload) },
+        )
+      }
       const message = payload?.error || 'No pudimos registrar el recinto en este momento.'
-      throw new ApiClientError(message, response.status, resolveErrorField(payload, message))
+      const fieldErrors = response.status === 400 ? resolveFieldErrors(payload, message) : {}
+      throw new ApiClientError(message, response.status, Object.keys(fieldErrors)[0] ?? null, { fieldErrors })
     }
 
     if (!payload || typeof payload !== 'object') {
@@ -199,5 +310,5 @@ class VenueApiClient {
 }
 
 const venueApiClient = new VenueApiClient()
-export { VenueApiClient, ApiClientError }
+export { VenueApiClient, ApiClientError, toCreateVenueBody, resolveFieldErrors }
 export default venueApiClient
