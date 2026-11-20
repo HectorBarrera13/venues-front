@@ -1,11 +1,10 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
-import useCurrentUser from '../hooks/useCurrentUser.js'
-import { getSession, goToSignIn } from '../auth/session.js'
-import { canManageVenue } from '../auth/access.js'
+import { useCallback, useEffect, useState } from 'react'
+import { goToSignIn } from '../auth/session.js'
 import venueApiClient from '../services/VenueApiClient.js'
 import VenueCard from './VenueCard.jsx'
-import VenueEditModal from './VenueEditModal.jsx'
 import VenueOwnerOnly from './VenueOwnerOnly.jsx'
+
+const PAGE_SIZE = 20
 
 function getLoadErrorMessage(error) {
   if (error.status === 401)
@@ -22,15 +21,14 @@ function StateIcon({ type }) {
 }
 
 function MyVenues() {
-  const { currentUser } = useCurrentUser()
   const [venues, setVenues] = useState([])
+  const [page, setPage] = useState(1)
+  const [pagination, setPagination] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [requestVersion, setRequestVersion] = useState(0)
-  const [editingVenue, setEditingVenue] = useState(null)
-  const [notification, setNotification] = useState(null)
 
-  const loadVenues = useCallback(() => setRequestVersion((version) => version + 1), [])
+  const loadVenues = useCallback(() => setRequestVersion((v) => v + 1), [])
 
   useEffect(() => {
     const controller = new AbortController()
@@ -38,9 +36,13 @@ function MyVenues() {
       setLoading(true)
       setError('')
       try {
-        const result = await venueApiClient.getVenues({ signal: controller.signal })
+        const result = await venueApiClient.getVenuePage(
+          { page, limit: PAGE_SIZE },
+          { signal: controller.signal },
+        )
         if (controller.signal.aborted) return
-        setVenues(result)
+        setVenues(result.data)
+        setPagination(result.pagination)
       } catch (requestError) {
         if (controller.signal.aborted || requestError.name === 'AbortError') return
         if (requestError.status === 401) goToSignIn()
@@ -51,64 +53,23 @@ function MyVenues() {
     }
     fetchVenues()
     return () => controller.abort()
-  }, [requestVersion])
+  }, [page, requestVersion])
 
-  const myVenues = useMemo(() => {
-    if (!currentUser?.userId) return []
-    return venues.filter((venue) => venue.ownerId === currentUser.userId)
-  }, [currentUser, venues])
-
-  const handleDelete = useCallback((venueToDelete) => {
-    if (!canManageVenue(getSession(), venueToDelete)) return
-    const confirmed = window.confirm(
-      `¿Estás seguro de que deseas eliminar el recinto "${venueToDelete.name || 'este recinto'}"? Esta acción no se puede deshacer.`
-    )
-    if (!confirmed) return
-
-    setVenues((prev) => prev.filter((v) => v.id !== venueToDelete.id))
-    setNotification({
-      type: 'success',
-      message: `El recinto "${venueToDelete.name || 'Recinto'}" ha sido eliminado.`,
-    })
-  }, [])
-
-  const handleEdit = useCallback((venueToEdit) => {
-    if (!canManageVenue(getSession(), venueToEdit)) return
-    setEditingVenue(venueToEdit)
-  }, [])
-
-  const handleSaveEdit = useCallback((updatedVenue) => {
-    if (!canManageVenue(getSession(), updatedVenue)) return
-    setVenues((prev) =>
-      prev.map((v) => (v.id === updatedVenue.id ? { ...v, ...updatedVenue } : v))
-    )
-    setEditingVenue(null)
-    setNotification({
-      type: 'success',
-      message: `El recinto "${updatedVenue.name}" ha sido actualizado correctamente.`,
-    })
-  }, [])
+  const totalPages = pagination?.totalPages ?? 1
 
   return (
     <section className="venues-section" id="my-venues" aria-labelledby="venue-list-title">
       <div className="section-heading">
-        <div><p className="section-label">Tu colección</p><h2 id="venue-list-title">Recintos registrados</h2></div>
-        {!loading && !error && <p className="venue-count" aria-live="polite">{myVenues.length} {myVenues.length === 1 ? 'recinto' : 'recintos'}</p>}
-      </div>
-
-      {notification && (
-        <div className="toast-notification" role="status">
-          <span>{notification.message}</span>
-          <button
-            type="button"
-            className="toast-close"
-            onClick={() => setNotification(null)}
-            aria-label="Cerrar notificación"
-          >
-            &times;
-          </button>
+        <div>
+          <p className="section-label">Tu colección</p>
+          <h2 id="venue-list-title">Recintos registrados</h2>
         </div>
-      )}
+        {!loading && !error && pagination && (
+          <p className="venue-count" aria-live="polite">
+            {pagination.total} {pagination.total === 1 ? 'recinto' : 'recintos'}
+          </p>
+        )}
+      </div>
 
       {loading && (
         <div className="skeleton-grid" aria-label="Cargando recintos" aria-busy="true">
@@ -124,36 +85,48 @@ function MyVenues() {
           </div>
         </div>
       )}
-      {!loading && !error && myVenues.length === 0 && (
+      {!loading && !error && venues.length === 0 && (
         <div className="state-panel">
           <div className="state-panel-inner">
             <div className="state-icon"><StateIcon /></div>
-            <h3>Aún no tienes recintos</h3><p>Registra tu primer espacio para comenzar a recibir eventos.</p>
-            <VenueOwnerOnly><a className="primary-button" href="/venues/register">Registrar mi primer recinto</a></VenueOwnerOnly>
+            <h3>Aún no tienes recintos</h3>
+            <p>Registra tu primer espacio para comenzar a recibir eventos.</p>
+            <VenueOwnerOnly>
+              <a className="primary-button" href="/venues/register">Registrar mi primer recinto</a>
+            </VenueOwnerOnly>
           </div>
         </div>
       )}
-      {!loading && !error && myVenues.length > 0 && (
+      {!loading && !error && venues.length > 0 && (
         <div className="venues-grid">
-          {myVenues.map((venue) => (
-            <VenueCard
-              key={venue.id}
-              venue={venue}
-              onEdit={handleEdit}
-              onDelete={handleDelete}
-            />
+          {venues.map((venue) => (
+            <VenueCard key={venue.id} venue={venue} />
           ))}
         </div>
       )}
 
-      {editingVenue && (
-        <VenueEditModal
-          key={editingVenue.id}
-          venue={editingVenue}
-          isOpen={Boolean(editingVenue)}
-          onClose={() => setEditingVenue(null)}
-          onSave={handleSaveEdit}
-        />
+      {!loading && !error && totalPages > 1 && (
+        <nav className="pagination-controls" aria-label="Paginación de recintos">
+          <button
+            type="button"
+            className="pagination-btn"
+            onClick={() => setPage((p) => p - 1)}
+            disabled={page <= 1}
+            aria-label="Página anterior"
+          >
+            ← Anterior
+          </button>
+          <span className="pagination-info">Página {page} de {totalPages}</span>
+          <button
+            type="button"
+            className="pagination-btn"
+            onClick={() => setPage((p) => p + 1)}
+            disabled={page >= totalPages}
+            aria-label="Página siguiente"
+          >
+            Siguiente →
+          </button>
+        </nav>
       )}
     </section>
   )
