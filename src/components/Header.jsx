@@ -24,6 +24,7 @@ function Header({ isRegisterRoute = typeof window !== 'undefined' && window.loca
           <a href={getPartnerHome(currentUser)} aria-current={!isRegisterRoute ? 'page' : undefined}>
             {currentUser?.role === ROLES.ORGANIZER ? 'Mis eventos' : 'Mis recintos'}
           </a>
+          <a href="/venues/search">Buscar recintos</a>
         </nav>
         {currentUser && (
           <div className="user-summary" aria-label={`Sesión de ${currentUser.name}`}>
