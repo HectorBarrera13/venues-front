@@ -289,7 +289,7 @@ npm run preview
 | Build | `npm run build` | Compiles production assets into `dist/` |
 | Preview | `npm run preview` | Serves the production build locally |
 | Lint | `npm run lint` | Runs ESLint across all source files |
-| Test | `npm test` | Runs authentication tests with the built-in Node.js test runner |
+| Test | `npm test` | Runs the full unit, MSW contract-mock and UI test suite (`node --test tests/*.test.js`; see [`tests/README.md`](tests/README.md)) |
 
 ---
 
