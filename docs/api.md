@@ -26,45 +26,63 @@ characters. `POST /auth/login` takes `{ username, password }` and returns
 alignment; the frontend currently uses its mock adapter rather than calling them.
 See [the contract reference](../context/product/mvp-03-partner-access.md).
 
-### 1. List Venues
+### 1. List & Search Venues
 
-Retrieves all physical venues registered in the system.
+Retrieves a paginated page of registered venues that have at least one saved seat map (`latestMapVersion >= 1`), optionally filtered by radius (`lat`, `lng`, `radius_km`), `country`, `city`, or `name`.
 
 - Method: `GET`
-- Path: `/venues`
+- Path: `/venues` (supports `?page=1&limit=20&lat=...&lng=...&radius_km=...&country=MX&city=...&name=...`)
 - Headers:
   - `Accept: application/json`
+  - `Authorization: Bearer <token>`
 
 #### Response
 
 - Status: `200 OK`
-- Body: Array of venue objects
+- Body: `{ data, pagination }`
 
 ```json
-[
-  {
-    "id": "venue-101",
-    "name": "Arena Ciudad",
-    "description": "Main indoor arena for concerts and sports.",
-    "location": "Avenida Reforma 100, CDMX",
-    "ownerId": "venue-owner-1",
-    "createdAt": "2026-03-15T12:00:00Z"
+{
+  "data": [
+    {
+      "id": "11111111-1111-4111-8111-111111111111",
+      "name": "Auditorio Nacional",
+      "description": "Main indoor arena for concerts and sports.",
+      "address": "Paseo de la Reforma 50",
+      "city": "Ciudad de Mexico",
+      "country": "MX",
+      "location": { "lat": 19.4245, "lng": -99.1951 },
+      "externalId": "123456",
+      "externalSource": "nominatim",
+      "osmRef": "way:123456",
+      "latestMapVersion": 1,
+      "ownerId": "venue-owner-1",
+      "createdAt": "2026-03-15T12:00:00.000Z"
+    }
+  ],
+  "pagination": {
+    "page": 1,
+    "limit": 20,
+    "total": 1,
+    "totalPages": 1
   }
-]
+}
 ```
+
+When `lat`, `lng`, and `radius_km` are provided, items are sorted ascending by distance and include `distance_km`.
 
 ---
 
 ### 2. Register Venue
 
-Registers a new physical venue under the authenticated partner.
+Registers a new physical venue under the authenticated partner (`latestMapVersion: 0`).
 
 - Method: `POST`
 - Path: `/venues`
 - Headers:
   - `Content-Type: application/json`
   - `Accept: application/json`
-  - `Authorization: Bearer <token>` (existing Venue client behavior)
+  - `Authorization: Bearer <token>`
 
 #### Request Body
 
@@ -72,22 +90,36 @@ Registers a new physical venue under the authenticated partner.
 {
   "name": "Teatro Metropolitan",
   "description": "Historic theater with tiered seating.",
-  "location": "Calle Independencia 90, CDMX"
+  "address": "Calle Independencia 90",
+  "city": "Ciudad de Mexico",
+  "country": "MX",
+  "location": { "lat": 19.4332, "lng": -99.1469 },
+  "externalId": "987654",
+  "externalSource": "nominatim",
+  "osmRef": "way:987654"
 }
 ```
 
 > [!NOTE]
 > The frontend does not submit `ownerId` or roles in the payload. It sends the
 > supplied Venue JWT via `getVenueToken()` and never sends an Events mock token.
-> Without a supplied JWT it omits Authorization. Venue backend validation and
-> token acceptance have not been verified.
+> Without a supplied JWT it omits Authorization.
 
 #### Responses
 
-- `201 Created`: Returns the persisted venue entity.
-- `400 Bad Request`: Missing or invalid fields (`name`, `description`, `location`).
-- `401 Unauthorized`: Missing, expired, or invalid authentication token under the future JWT contract.
+- `201 Created`: Returns the persisted venue entity (`latestMapVersion: 0`).
+- `400 Bad Request`: Validation error with `{ error, field, message, errors[] }`.
+- `401 Unauthorized`: Missing, expired, or invalid authentication token.
 - `403 Forbidden`: Authenticated user does not have the `VENUE_OWNER` role.
+- `409 Conflict`: Venue already registered (`{ error, existingVenueId }`).
+
+---
+
+### 2b. Venue Detail & Seat Maps
+
+- `GET /venues/{id}` → `200` with full venue metadata (`latestMapVersion`, `ownerId`, no map geometry) or `404`.
+- `GET /venues/{id}/map[?version=N]` → `200` with immutable `{ venueId, version, createdAt, stage, zones, seats }`, `400` on invalid `version`, `404` when unmapped or unknown version.
+- `POST /venues/{id}/map` → `201` storing immutable version `latestMapVersion + 1`, `403` for non-owners, `422` with `{ error, errors[] }` (`SEAT_WITHOUT_ZONE`, `EMPTY_ZONE`, `OVERLAP`, `UNNAMED_ZONE`, `DUPLICATE_LABEL`, `NO_STAGE`).
 
 ---
 
