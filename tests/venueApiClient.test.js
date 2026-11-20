@@ -218,3 +218,48 @@ test('getVenues surfaces API errors with their status', async () => {
   await assert.rejects(client.getVenues(), (error) => error.status === 401)
   storage.set(TOKEN_STORAGE_KEY, token)
 })
+
+// VEN-602: searchVenues
+test('searchVenues without filters fetches GET /venues with page and limit', async () => {
+  const { data, pagination } = await client.searchVenues()
+  assert.ok(Array.isArray(data))
+  assert.equal(typeof pagination.total, 'number')
+  assert.equal(pagination.page, 1)
+})
+
+test('searchVenues omits undefined geo params from the query string', async (context) => {
+  let capturedUrl
+  const original = globalThis.fetch
+  context.mock.method(globalThis, 'fetch', async (url, ...args) => {
+    capturedUrl = url
+    return original(url, ...args)
+  })
+  await client.searchVenues({ name: 'sala' })
+  assert.ok(!capturedUrl.includes('lat='), 'lat must not appear when not set')
+  assert.ok(!capturedUrl.includes('lng='), 'lng must not appear when not set')
+  assert.ok(capturedUrl.includes('name=sala'), 'name must appear in query')
+})
+
+test('searchVenues with geo params includes lat, lng and radius_km', async (context) => {
+  let capturedUrl
+  const original = globalThis.fetch
+  context.mock.method(globalThis, 'fetch', async (url, ...args) => {
+    capturedUrl = url
+    return original(url, ...args)
+  })
+  await client.searchVenues({ lat: 40.41, lng: -3.7, radius_km: 20 })
+  assert.ok(capturedUrl.includes('lat=40.41'))
+  assert.ok(capturedUrl.includes('lng=-3.7'))
+  assert.ok(capturedUrl.includes('radius_km=20'))
+})
+
+test('searchVenues throws ApiClientError on 400', async (context) => {
+  context.mock.method(globalThis, 'fetch', async () =>
+    Response.json({ error: 'Invalid coordinates or radius' }, { status: 400 }),
+  )
+  await assert.rejects(client.searchVenues({ lat: 999, lng: 0, radius_km: 10 }), (error) => {
+    assert.equal(error.name, 'ApiClientError')
+    assert.equal(error.status, 400)
+    return true
+  })
+})
