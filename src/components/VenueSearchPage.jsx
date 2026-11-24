@@ -2,7 +2,7 @@
 // Three search modes: geo (Leaflet map + radius), text (name/country/city),
 // and general listing. AbortController cancels in-flight requests when filters change.
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useReducer, useRef, useState } from 'react'
 import { MapContainer, TileLayer, Circle, useMapEvents } from 'react-leaflet'
 import venueApiClient from '../services/VenueApiClient.js'
 import VenueCard from './VenueCard.jsx'
@@ -10,6 +10,18 @@ import 'leaflet/dist/leaflet.css'
 
 const PAGE_SIZE = 20
 const MODES = { GEO: 'geo', TEXT: 'text', ALL: 'all' }
+
+const INITIAL_SEARCH_STATE = { loading: false, error: '', results: [], pagination: null }
+
+function searchReducer(state, action) {
+  switch (action.type) {
+    case 'loading': return { ...state, loading: true, error: '' }
+    case 'success': return { loading: false, error: '', results: action.results, pagination: action.pagination }
+    case 'error': return { loading: false, error: action.error, results: [], pagination: null }
+    case 'reset': return INITIAL_SEARCH_STATE
+    default: return state
+  }
+}
 
 // Leaflet click handler component (must be inside MapContainer)
 function MapClickHandler({ onMapClick }) {
@@ -55,11 +67,8 @@ function VenueSearchPage() {
   const [cityFilter, setCityFilter] = useState('')
 
   // Results
-  const [results, setResults] = useState([])
-  const [pagination, setPagination] = useState(null)
+  const [{ loading, error, results, pagination }, dispatch] = useReducer(searchReducer, INITIAL_SEARCH_STATE)
   const [page, setPage] = useState(1)
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
 
   const abortRef = useRef(null)
 
@@ -68,27 +77,22 @@ function VenueSearchPage() {
     const controller = new AbortController()
     abortRef.current = controller
 
-    setLoading(true)
-    setError('')
+    dispatch({ type: 'loading' })
     try {
       const result = await venueApiClient.searchVenues(
         { ...filters, page: pageNum, limit: PAGE_SIZE },
         { signal: controller.signal },
       )
       if (controller.signal.aborted) return
-      setResults(result.data)
-      setPagination(result.pagination)
+      dispatch({ type: 'success', results: result.data, pagination: result.pagination })
     } catch (err) {
       if (err.name === 'AbortError') return
-      if (err.status === 400) {
-        setError('Coordenadas o radio inválidos. Revisa los valores e inténtalo de nuevo.')
-      } else {
-        setError(err.message || 'No se pudo realizar la búsqueda.')
-      }
-      setResults([])
-      setPagination(null)
-    } finally {
-      if (!controller.signal.aborted) setLoading(false)
+      dispatch({
+        type: 'error',
+        error: err.status === 400
+          ? 'Coordenadas o radio inválidos. Revisa los valores e inténtalo de nuevo.'
+          : err.message || 'No se pudo realizar la búsqueda.',
+      })
     }
   }, [])
 
@@ -105,8 +109,7 @@ function VenueSearchPage() {
         if (cityFilter.trim()) filters.city = cityFilter.trim()
         search(filters, page)
       } else {
-        setResults([])
-        setPagination(null)
+        dispatch({ type: 'reset' })
       }
     } else if (mode === MODES.ALL) {
       search({}, page)
@@ -117,9 +120,7 @@ function VenueSearchPage() {
   const switchMode = (newMode) => {
     setMode(newMode)
     setPage(1)
-    setResults([])
-    setPagination(null)
-    setError('')
+    dispatch({ type: 'reset' })
   }
 
   const handleMapClick = ({ lat, lng }) => {
