@@ -64,9 +64,18 @@ remain unverified. Events details/update integration remains pending.
 **T-147:** `/events` now lists the current organizer's events with pagination,
 metadata/status/date display, independently loaded venue names, and loading/empty/
 retry states. Requests are cancelled on navigation/session changes, with old data
-hidden while the new request is pending. Cards link to the forthcoming T-148 detail
-route. Live browser verification is pending because localhost:5173 was unreachable
-and the agent environment could not bind a development-server port.
+hidden while the new request is pending.
+**T-148 & T-150:** `/events/{id}` renders event detail metadata, scheduled dates,
+and resolved Venue name/location with edit link gated to the owning organizer;
+`/events/{id}/edit` prefills persisted data, shows the browser timezone, converts
+dates without timezone shifts, prevents concurrent submissions, preserves inputs on
+error, and persists via `PATCH /api/v1/events/{id}`.
+**T-149 & T-151:** `dsaster-event-management` implements ownership-protected
+`PATCH /api/v1/events/{id}` with atomic transactions and explicit schedule
+targeting, and `HttpVenueClient` aligns with live `venue-service` (`GET /venues/{id}`
+with HS256 bearer JWT via `VENUE_SERVICE_TOKEN`). Live integration verification
+against running MongoDB/PostgreSQL services is documented in
+`docs/integration-verification.md`.
 
 ## MVP 01 — Partner registration
 
@@ -90,16 +99,13 @@ Search is owned by Error200; Booking by Sap-atitos. Their repositories/contracts
 
 ## Current implementation and gaps
 
-Reviewed Events backend: `dsaster-event-management`, local `testing` checkout at `10fba4d`, including working-tree OpenAPI updates.
+Reviewed Events backend: `dsaster-event-management` (`feat_T-149_event_update_patch` + `fix_T-151_venue_client_integration`) and live Venue backend: `HectorBarrera13/venues`.
 
-- POST registration, listing and detail retrieval exist; frontend registration and listing are connected, while detail/update screens remain pending.
-- Registration creates the event and schedule in a database transaction and returns `201` confirmation.
-- Event creation derives organizer identity from `Bearer mock:<partner-uuid>` and rejects non-organizers; there is no request-body identity fallback in the current checkout.
-- Real venue validation exists, but permissive mock validation is enabled by default. Verify the actual Venue API path and disable that mock for integration acceptance.
+- POST registration, listing, detail retrieval, and ownership-protected PATCH updates are implemented and verified end-to-end against PostgreSQL and live `venue-service`.
+- Registration and updates attribute or enforce `organizer_id` strictly from `Bearer mock:<partner-uuid>` and reject non-organizers/non-owners (`403`); there is no request-body identity fallback.
+- Real venue validation works with `MOCK_VENUE_SERVICE=false`, `VENUE_SERVICE_URL`, and `VENUE_SERVICE_TOKEN` against `GET /venues/{id}`. Note that `GET /venues` exposes only venues with `latestMapVersion >= 1`.
 - Name search and synchronization to Search are not implemented in the inspected Events code.
-- Reads provide venue IDs, not venue names/locations; enrich from the venue catalogue or agree an upstream projection.
-- Backend dates require future RFC 3339 timestamps; the PRD only specifies valid calendar dates. Align semantics and error responses.
-- Venue frontend uses a map/read-only address instead of the required free-text input; edit/delete changes are local only.
+- Production Auth integration (`MOCK_AUTH=false` with Ninjava HS256 JWT) remains deferred; Venue calls use `VITE_DEV_TOKEN` HS256 JWTs independently of Events mock credentials.
 
 ## Explicitly excluded
 
@@ -107,7 +113,4 @@ Seat maps, sections, rows, seats, capacity, categories, prices, on-sale scheduli
 
 ## Next frontend work
 
-Verify live Venue catalogue access and Event registration, then implement organizer
-event details and updating. Use [the API reference](../../docs/api.md) for
-available backend contracts. Resolve backend integration gaps separately; do not
-invent Search or Booking endpoints.
+Open and validate repository PRs (Ticket #152) and maintain Search/Booking boundaries without inventing undeclared endpoints.
