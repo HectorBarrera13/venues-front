@@ -179,8 +179,23 @@ backend endpoint remains public; frontend filtering is not server authorization.
 
 Details include metadata and arrays of `schedules`, `pricing_tiers`, `sales`, and `media`. Dates are UTC timestamps, prices are decimal strings, and fields use snake_case. Venue name/location are not included; resolve them through the Venue catalogue. Pricing, sales windows, and media are outside the MVP.
 
+### 6. Update Event
+
+- Method: `PATCH`
+- Path: `/api/v1/events/{id}` (runtime alias: `/events/{id}`)
+- Headers: `Content-Type: application/json`, `Accept: application/json`, `Authorization: Bearer mock:<organizer-uuid>`
+- Body: Optional subset of `name`, `artist`, `date` (future RFC 3339 timestamp), `schedule_id` (required only when the event has multiple schedules), and `venue_id` (`venueId` alias accepted). Server-owned fields (`id`, `organizer_id`, `status`, `created_at`, `updated_at`, `version`, `published_at`) and unknown fields return `400`.
+- Responses:
+  - `200 OK`: Updated `EventResponseDto` persisted atomically with refreshed `updated_at`.
+  - `400 Bad Request`: Empty payload, invalid/blank text, non-future `date`, server-owned/unknown field, or missing `schedule_id` for multi-schedule events.
+  - `401 Unauthorized`: Missing, malformed, or unknown partner bearer token.
+  - `403 Forbidden`: Partner is not an organizer or does not own the event.
+  - `404 Not Found`: Event does not exist.
+  - `422 Unprocessable Entity`: Changed `venue_id` rejected by Venue Service or `schedule_id` does not belong to the event.
+  - `500 Internal Server Error`: Persistence or upstream Venue Service error.
+
 > [!NOTE]
-> Events defaults to permissive venue mocking. Real validation needs `MOCK_VENUE_SERVICE=false` and `VENUE_SERVICE_URL`; the client expects `/api/v1/venues/{id}`, which must be verified against the actual Venue API. Search synchronization and ticket issuance are separate Search/Booking dependencies.
+> Events defaults to permissive venue mocking (`MOCK_VENUE_SERVICE=true`). With `MOCK_VENUE_SERVICE=false` and `VENUE_SERVICE_URL` configured, `HttpVenueClient` queries `GET /venues/{id}` with an optional `VENUE_SERVICE_TOKEN` bearer JWT. See [the live integration verification runbook](integration-verification.md). Search synchronization and ticket issuance remain separate Search/Booking dependencies.
 
 ---
 
