@@ -135,11 +135,10 @@ test('event form shows the complete supplied venue catalogue and handles unavail
 test('actual venue cards show mutation controls only to their current owner', () => {
   const venue = { name: 'Arena', ownerId: '22222222-2222-2222-2222-222222222222' }
   persistToken(authenticateMockPartner('owner@example.com', 'Backstage123!'))
-  assert.match(render(VenueCard, { venue }), /Editar Arena/)
-  assert.match(render(VenueCard, { venue }), /Eliminar Arena/)
-  assert.doesNotMatch(render(VenueCard, { venue: { ...venue, ownerId: 'another-owner' } }), /Editar Arena|Eliminar Arena/)
+  assert.match(render(VenueCard, { venue }), /Dibujar mapa de Arena/)
+  assert.doesNotMatch(render(VenueCard, { venue: { ...venue, ownerId: 'another-owner' } }), /Dibujar mapa de Arena|Editar mapa de Arena/)
   persistToken(authenticateMockPartner('organizer@example.com', 'Backstage123!'))
-  assert.doesNotMatch(render(VenueCard, { venue }), /Editar Arena|Eliminar Arena/)
+  assert.doesNotMatch(render(VenueCard, { venue }), /Dibujar mapa de Arena|Editar mapa de Arena/)
   persistToken(null)
-  assert.doesNotMatch(render(VenueCard, { venue }), /Editar Arena|Eliminar Arena/)
+  assert.doesNotMatch(render(VenueCard, { venue }), /Dibujar mapa de Arena|Editar mapa de Arena/)
 })
