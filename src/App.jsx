@@ -17,6 +17,8 @@ import OrganizerEventsPage from "./components/OrganizerEventsPage.jsx";
 import EventDetailPage from "./domains/events/detail/EventDetailPage.jsx";
 import EventEditPage from "./domains/events/edit/EventEditPage.jsx";
 import MapEditorPage from "./domains/mapeditor/MapEditorPage.jsx";
+import VenuePage from "./components/VenuePage.jsx";
+import VenueSearchPage from "./components/VenueSearchPage.jsx";
 
 function App() {
   const { currentUser } = useCurrentUser();
@@ -36,11 +38,17 @@ function App() {
     : null;
   const mapMatch = currentPath.match(/^\/venues\/([^/]+)\/map$/);
   const mapVenueId = mapMatch ? decodeURIComponent(mapMatch[1]) : null;
+  // /venues/:id — explicit exclusions prevent collisions with static routes
+  const venueDetailMatch = currentPath.match(/^\/venues\/([^/]+)$/);
+  const venueDetailId = venueDetailMatch && !['register', 'search'].includes(venueDetailMatch[1])
+    ? decodeURIComponent(venueDetailMatch[1])
+    : null;
+  const isVenueSearch = currentPath === "/venues/search";
   const isRegisterRoute = currentPath === "/venues/register" || currentPath === "/events/register";
   const isSignInRoute = currentPath === SIGN_IN_PATH;
   const redirectTo = getSessionRedirect(currentPath, currentUser);
   const hasAccess = canAccessRoute(currentUser, currentPath);
-  const isKnownView = Boolean(eventEditId) || Boolean(eventDetailId) || Boolean(mapVenueId) || ["/", "/venues", "/venues/register", "/events", "/events/register"].includes(currentPath);
+  const isKnownView = Boolean(eventEditId) || Boolean(eventDetailId) || Boolean(mapVenueId) || Boolean(venueDetailId) || isVenueSearch || ["/", "/venues", "/venues/register", "/venues/search", "/events", "/events/register"].includes(currentPath);
 
   useEffect(() => {
     if (redirectTo) replaceRoute(redirectTo);
@@ -77,6 +85,10 @@ function App() {
           <EventDetailPage eventId={eventDetailId} />
         ) : mapVenueId ? (
           <MapEditorPage venueId={mapVenueId} />
+        ) : venueDetailId ? (
+          <VenuePage venueId={venueDetailId} />
+        ) : isVenueSearch ? (
+          <VenueSearchPage />
         ) : currentPath === "/events" ? (
           <OrganizerEventsPage />
         ) : currentPath === "/events/register" ? (

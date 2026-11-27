@@ -359,6 +359,57 @@ class VenueApiClient {
    *   that isn't allowed to register venues.
    * @throws {Error} On network failures or an unexpected response body.
    */
+  /**
+   * Searches venues with C5 filters (VEN-602).
+   *
+   * All params are optional. Undefined/null values are omitted from the query
+   * so the backend never receives `lat=undefined`. Geo params (lat, lng,
+   * radius_km) must be supplied together; a partial set returns 400.
+   *
+   * @param {{ lat?: number, lng?: number, radius_km?: number, country?: string,
+   *           city?: string, name?: string, page?: number, limit?: number }} [filters]
+   * @param {{ signal?: AbortSignal }} [options]
+   * @returns {Promise<{ data: object[], pagination: { page: number, limit: number, total: number, totalPages: number } }>}
+   * @throws {ApiClientError} 400 for invalid coordinates/radius, 401, 403.
+   */
+  async searchVenues({ lat, lng, radius_km, country, city, name, page = 1, limit = 20 } = {}, { signal } = {}) {
+    const token = getVenueToken()
+    const params = new URLSearchParams({ page: String(page), limit: String(limit) })
+    if (lat !== undefined && lat !== null) params.set('lat', String(lat))
+    if (lng !== undefined && lng !== null) params.set('lng', String(lng))
+    if (radius_km !== undefined && radius_km !== null) params.set('radius_km', String(radius_km))
+    if (country) params.set('country', country)
+    if (city) params.set('city', city)
+    if (name) params.set('name', name)
+
+    let response
+    try {
+      response = await fetch(`${this.baseUrl}/venues?${params}`, {
+        headers: {
+          Accept: 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        signal,
+      })
+    } catch (error) {
+      if (error.name === 'AbortError') throw error
+      throw new Error('No fue posible conectar con el servidor.', { cause: error })
+    }
+
+    const payload = await response.json().catch(() => null)
+
+    if (!response.ok) {
+      const message = payload?.error || 'No pudimos realizar la búsqueda.'
+      throw new ApiClientError(message, response.status)
+    }
+
+    if (!Array.isArray(payload?.data) || !Number.isInteger(payload?.pagination?.totalPages)) {
+      throw new Error('El servidor devolvió una respuesta inesperada.')
+    }
+
+    return payload
+  }
+
   async createVenue(data, { signal } = {}) {
     const token = getVenueToken()
 
